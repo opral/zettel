@@ -2,8 +2,6 @@
 	"extends": "@opral/tsconfig/default",
 	"include": ["src/**/*"],
 	"compilerOptions": {
-		"allowJs": false,
-		"checkJs": false,
 		"isolatedDeclarations": false,
 		"allowImportingTsExtensions": false,
 		"emitDeclarationOnly": false,
