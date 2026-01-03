@@ -20,6 +20,10 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+        with:
+          submodules: recursive
 
       - name: Setup Pnpm
         uses: pnpm/action-setup@v4
