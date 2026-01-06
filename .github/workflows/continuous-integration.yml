@@ -1,40 +1,31 @@
 name: Continuous Integration
 
 on:
-  workflow_dispatch:
   push:
     branches:
-      - "main"
+      - main
   pull_request:
-    branches:
-      - "**"
 
 jobs:
-  ci:
-    strategy:
-      matrix:
-        os: [blacksmith-8vcpu-ubuntu-2404]
-        version: [22]
-    runs-on: ${{ matrix.os }}
-    environment: staging
+  build-and-test:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout project
+      - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-        with:
-          submodules: recursive
 
       - name: Setup Pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
 
-      - name: Install node
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.version }}
+          node-version: 24
           cache: "pnpm"
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
-      - run: pnpm run ci
+      - name: Run CI
+        run: pnpm run ci

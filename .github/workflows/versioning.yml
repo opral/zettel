@@ -9,29 +9,28 @@ on:
     branches: [main]
     types:
       - completed
+  workflow_dispatch:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   versioning:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: versioning
     environment: production
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-        with:
-          submodules: recursive
 
       - name: Setup Pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           # https://github.com/npm/cli/issues/6184#issuecomment-1544496444
           registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
