@@ -1,7 +1,31 @@
-import { TypeCompiler } from "@sinclair/typebox/compiler";
+import { TypeCompiler, TypeCheck } from "@sinclair/typebox/compiler";
+import { Value } from "@sinclair/typebox/value";
 import { ZettelDocJsonSchema, type ZettelDoc } from "./schema.js";
 
-const Z = TypeCompiler.Compile(ZettelDocJsonSchema);
+// Lazily initialize to avoid evaluating TypeBox's compiler at module load in
+// CSP-restricted runtimes (e.g. Cloudflare Workers).
+let cachedValidator: TypeCheck<typeof ZettelDocJsonSchema> | undefined;
+
+function getValidator() {
+	if (cachedValidator) {
+		return cachedValidator;
+	}
+
+	try {
+		// Prefer compiled validator for speed when eval is permitted.
+		cachedValidator = TypeCompiler.Compile(ZettelDocJsonSchema);
+	} catch {
+		// Fall back to dynamic checking when code generation is blocked.
+		cachedValidator = new TypeCheck(
+			ZettelDocJsonSchema,
+			[],
+			(value) => Value.Check(ZettelDocJsonSchema, value),
+			""
+		);
+	}
+
+	return cachedValidator;
+}
 
 export type SerializableError = { message: string };
 
@@ -29,9 +53,10 @@ export type ValidationResult<T> =
  *   }
  */
 export function validate(zettel: unknown): ValidationResult<ZettelDoc> {
-	const result = Z.Check(zettel);
+	const validator = getValidator();
+	const result = validator.Check(zettel);
 	if (!result) {
-		const errors = [...Z.Errors(zettel)];
+		const errors = [...validator.Errors(zettel)];
 		return {
 			success: false,
 			data: undefined,
