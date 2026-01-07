@@ -3,6 +3,9 @@
 	"type": "module",
 	"version": "0.1.0",
 	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/opral/zettel"
