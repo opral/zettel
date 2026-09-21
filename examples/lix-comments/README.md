@@ -42,3 +42,7 @@ Results and screenshots are written to ignored `artifacts/`. See [VERIFICATION.m
 The extended user-flow suites also exercise formatting, selection replacement, clipboard, undo/redo, code-block carets, unsaved drafts, and failed-save recovery. See [QA.md](./QA.md) for findings and scope. Run only those suites with `pnpm --filter zettel-lix-comments test:qa`.
 
 Select prose text and choose **Link** (or Ctrl/⌘ K) to add a URL. Place the caret in an existing link to edit or remove it. Supports HTTP(S) and mailto links; formatting, Markdown export, and saved JSON retain link annotations.
+
+## Real-file target lab
+
+Open `/target-lab.html` from the demo to inspect or rerun 28 isolated experiments using the SDK’s actual bundled Markdown and CSV plugins. The original composer still uses its fixture target tables; the lab uses real `markdown_node` and `csv_row` projections without touching your comments. Run `pnpm --filter zettel-lix-comments test:targets` for the browser/API and persistence checks. See [TARGET-LAB.md](./TARGET-LAB.md) for results and limitations.

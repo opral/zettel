@@ -1,14 +1,23 @@
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { openModel } from './model.mjs';
+import { runTargetLab } from './target-lab.mjs';
 export async function startServer({ port = 49705, path, persist = true } = {}) {
   const model = await openModel({ path, persist });
+  let labRun;
   const server = await createServer({
     root: fileURLToPath(new URL('.', import.meta.url)),
     configFile: false,
     server: { host: '127.0.0.1', port, strictPort: true },
     plugins: [{ name: 'lix-comments-api', configureServer(vite) {
       vite.middlewares.use('/api', (req, res) => {
+        if (req.method === 'POST' && req.url === '/target-lab') {
+          res.setHeader('Content-Type', 'application/json');
+          if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) { res.statusCode = 403; res.end(JSON.stringify({error:'Cross-origin mutation rejected'})); return; }
+          labRun ??= runTargetLab().finally(() => { labRun = undefined; });
+          labRun.then(report => res.end(JSON.stringify(report))).catch(error => { res.statusCode = 500; res.end(JSON.stringify({error:error.message})); });
+          return;
+        }
         model.serial(async () => {
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'no-store');
