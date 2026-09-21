@@ -54,6 +54,6 @@ export function isSpan(value: unknown): value is Span {
   return isNode(value, "zettel_span") && typeof (value as Span).text === "string";
 }
 
-export function isNode(value: unknown, type?: string): value is { type: string; zettel_key: string } {
-  return Boolean(value && typeof value === "object" && typeof (value as { type?: unknown }).type === "string" && (type === undefined || (value as { type: string }).type === type) && typeof (value as { zettel_key?: unknown }).zettel_key === "string");
+export function isNode(value: unknown, type?: string): value is { _type: string; _key: string } {
+  return Boolean(value && typeof value === "object" && typeof (value as { _type?: unknown })._type === "string" && (type === undefined || (value as { _type: string })._type === type) && typeof (value as { _key?: unknown })._key === "string");
 }

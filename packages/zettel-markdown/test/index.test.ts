@@ -5,7 +5,6 @@ import {
   toMarkdown,
 } from "../src/index.js";
 import {
-  SCHEMA_URL,
   type Document,
   type List,
   type Table,
@@ -17,16 +16,16 @@ describe("GFM import", () => {
     const document = fromMarkdown(
       "3. [ ] first\n4. ordinary\n5. [x] third\n\n- [x] outer\n  - [ ] inner\n",
     );
-    expect(document.$schema).toBe(SCHEMA_URL);
+    expect(document._type).toBe("zettel_doc");
     expect(document.blocks).toHaveLength(2);
 
     const ordered = document.blocks[0] as List;
     expect(ordered).toMatchObject({
-      type: "zettel_list",
+      _type: "zettel_list",
       kind: "number",
       start: 3,
     });
-    if (ordered.type !== "zettel_list")
+    if (ordered._type !== "zettel_list")
       throw new Error("expected ordered list");
     expect(ordered.items.map((item) => item.checked)).toEqual([
       false,
@@ -35,13 +34,13 @@ describe("GFM import", () => {
     ]);
 
     const bullet = document.blocks[1] as List;
-    expect(bullet.type).toBe("zettel_list");
-    if (bullet.type !== "zettel_list") throw new Error("expected bullet list");
+    expect(bullet._type).toBe("zettel_list");
+    if (bullet._type !== "zettel_list") throw new Error("expected bullet list");
     expect(bullet.items).toHaveLength(1);
     expect(bullet.items[0]?.checked).toBe(true);
     const nested = bullet.items[0]?.blocks[1] as List | undefined;
-    expect(nested).toMatchObject({ type: "zettel_list", kind: "bullet" });
-    if (nested?.type !== "zettel_list") throw new Error("expected nested list");
+    expect(nested).toMatchObject({ _type: "zettel_list", kind: "bullet" });
+    if (nested?._type !== "zettel_list") throw new Error("expected nested list");
     expect(nested.items[0]?.checked).toBe(false);
   });
 
@@ -51,10 +50,10 @@ describe("GFM import", () => {
     );
     const table = document.blocks[0] as Table;
     expect(table).toMatchObject({
-      type: "zettel_table",
+      _type: "zettel_table",
       align: ["center", "right"],
     });
-    if (table.type !== "zettel_table") throw new Error("expected table");
+    if (table._type !== "zettel_table") throw new Error("expected table");
     expect(table.rows).toHaveLength(2);
     expect(table.rows[0]?.cells[0]?.children[0]).toMatchObject({
       text: "f|oo",
@@ -75,18 +74,18 @@ describe("GFM import", () => {
       "<section data-x='1'>\nraw\n</section>\n\nhello <kbd>x</kbd>",
     );
     expect(document.blocks[0]).toMatchObject({
-      type: "zettel_html",
+      _type: "zettel_html",
       value: "<section data-x='1'>\nraw\n</section>",
     });
     const paragraph = document.blocks[1] as TextBlock;
-    if (paragraph?.type !== "zettel_text")
+    if (paragraph?._type !== "zettel_block")
       throw new Error("expected paragraph");
     expect(paragraph.children[1]).toMatchObject({
-      type: "zettel_html_inline",
+      _type: "zettel_html_inline",
       value: "<kbd>",
     });
     expect(paragraph.children[3]).toMatchObject({
-      type: "zettel_html_inline",
+      _type: "zettel_html_inline",
       value: "</kbd>",
     });
   });
@@ -96,7 +95,7 @@ describe("GFM import", () => {
       '[a \\*link\\*](https://example.com "title") ![alt](image.png "caption") \\# literal\\\nnext\n\n~~~js meta=value\nconst x = `|`;\n~~~\n',
     );
     const paragraph = document.blocks[0] as TextBlock;
-    if (paragraph?.type !== "zettel_text")
+    if (paragraph?._type !== "zettel_block")
       throw new Error("expected paragraph");
     expect(paragraph.children[0]).toMatchObject({ text: "a *link*" });
     expect(paragraph.children[0]?.marks).toHaveLength(1);
@@ -105,18 +104,18 @@ describe("GFM import", () => {
       title: "title",
     });
     expect(paragraph.children[2]).toMatchObject({
-      type: "zettel_image",
+      _type: "zettel_image",
       src: "image.png",
       alt: "alt",
       title: "caption",
       marks: [],
     });
     expect(paragraph.children[4]).toMatchObject({
-      type: "zettel_break",
+      _type: "zettel_break",
       marks: [],
     });
     expect(document.blocks[1]).toMatchObject({
-      type: "zettel_code",
+      _type: "zettel_code",
       language: "js",
       meta: "meta=value",
       code: "const x = `|`;",
@@ -130,11 +129,11 @@ describe("GFM import", () => {
     const paragraph = document.blocks[0] as TextBlock;
     expect(paragraph.children[0]).toMatchObject({ text: "reference" });
     expect(paragraph.children[1]).toMatchObject({
-      type: "zettel_span",
+      _type: "zettel_span",
       text: " ",
     });
     expect(paragraph.children[2]).toMatchObject({
-      type: "zettel_image",
+      _type: "zettel_image",
       src: "/asset.png",
       alt: "image",
       title: "caption",
@@ -161,13 +160,13 @@ describe("GFM import", () => {
 
   test("keeps Markdown parsed inside blank lines in HTML containers", () => {
     const document = fromMarkdown('<DIV CLASS="foo">\n\n*Markdown*\n\n</DIV>');
-    expect(document.blocks.map((block) => block.type)).toEqual([
+    expect(document.blocks.map((block) => block._type)).toEqual([
       "zettel_html",
-      "zettel_text",
+      "zettel_block",
       "zettel_html",
     ]);
     expect(document.blocks[1]).toMatchObject({
-      type: "zettel_text",
+      _type: "zettel_block",
       children: [{ text: "Markdown", marks: ["em"] }],
     });
     expect(toMarkdown(document)).toBe(
@@ -180,7 +179,7 @@ describe("GFM import", () => {
     const paragraph = document.blocks[0] as TextBlock;
     expect(paragraph.children[0]).toMatchObject({
       text: "^a",
-      marks: [paragraph.markDefs[0]?.zettel_key],
+      marks: [paragraph.markDefs[0]?._key],
     });
     expect(paragraph.markDefs[0]).toMatchObject({ href: "/url" });
     expect(toMarkdown(document)).toBe("[^a](/url)\n");
@@ -214,8 +213,8 @@ describe("GFM export", () => {
       "# title\n\n* [x] done\n* plain\n\n| a  |  b |\n| :- | -: |\n| c  |  d |\n",
     );
     const reread = fromMarkdown(output);
-    expect(reread.blocks.map((block) => block.type)).toEqual([
-      "zettel_text",
+    expect(reread.blocks.map((block) => block._type)).toEqual([
+      "zettel_block",
       "zettel_list",
       "zettel_table",
     ]);
@@ -229,8 +228,8 @@ describe("GFM export", () => {
 
   test("rejects extension nodes instead of silently dropping them", () => {
     const document = {
-      $schema: SCHEMA_URL,
-      blocks: [{ type: "custom_block", zettel_key: "custom1" }],
+      _type: "zettel_doc",
+      blocks: [{ type: "custom_block", _key: "custom1" }],
     } as unknown as Document;
     expect(() => toMarkdown(document)).toThrow(MarkdownConversionError);
   });

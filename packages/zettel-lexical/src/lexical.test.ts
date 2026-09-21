@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createEditor } from "lexical";
 import {
-  SCHEMA_URL,
   ZettelNodes,
   createZettelEditor,
   exportDocument,
@@ -13,53 +12,53 @@ import {
   type Document,
 } from "./index.js";
 
-const link = { type: "zettel_link" as const, zettel_key: "link-1", href: "https://example.com", title: "Example" };
+const link = { _type: "zettel_link" as const, _key: "link-1", href: "https://example.com", title: "Example" };
 
 function fixture(): Document {
   return {
-    $schema: SCHEMA_URL,
+    _type: "zettel_doc",
     blocks: [
       {
-        type: "zettel_text",
-        zettel_key: "text-1",
+        _type: "zettel_block",
+        _key: "text-1",
         style: "normal",
         markDefs: [link],
         children: [
-          { type: "zettel_span", zettel_key: "span-1", text: "Hello ", marks: [] },
-          { type: "zettel_span", zettel_key: "span-2", text: "world", marks: ["strong", "link-1"] },
-          { type: "zettel_break", zettel_key: "break-1", marks: ["em"] },
-          { type: "zettel_image", zettel_key: "image-1", src: "https://example.com/a.png", alt: "A", marks: [] },
+          { _type: "zettel_span", _key: "span-1", text: "Hello ", marks: [] },
+          { _type: "zettel_span", _key: "span-2", text: "world", marks: ["strong", "link-1"] },
+          { _type: "zettel_break", _key: "break-1", marks: ["em"] },
+          { _type: "zettel_image", _key: "image-1", src: "https://example.com/a.png", alt: "A", marks: [] },
         ],
       },
       {
-        type: "zettel_list",
-        zettel_key: "list-1",
+        _type: "zettel_list",
+        _key: "list-1",
         kind: "number",
         start: 3,
         spread: false,
         items: [{
-          type: "zettel_list_item",
-          zettel_key: "item-1",
+          _type: "zettel_list_item",
+          _key: "item-1",
           spread: false,
           checked: true,
-          blocks: [{ type: "zettel_text", zettel_key: "item-text", style: "normal", markDefs: [], children: [{ type: "zettel_span", zettel_key: "item-span", text: "Task", marks: [] }] }],
+          blocks: [{ _type: "zettel_block", _key: "item-text", style: "normal", markDefs: [], children: [{ _type: "zettel_span", _key: "item-span", text: "Task", marks: [] }] }],
         }],
       },
-      { type: "zettel_code", zettel_key: "code-1", code: "const x = 1;", language: "js" },
+      { _type: "zettel_code", _key: "code-1", code: "const x = 1;", language: "js" },
       {
-        type: "zettel_table",
-        zettel_key: "table-1",
+        _type: "zettel_table",
+        _key: "table-1",
         align: ["left", "right"],
         rows: [{
-          type: "zettel_table_row",
-          zettel_key: "row-1",
+          _type: "zettel_table_row",
+          _key: "row-1",
           cells: [
-            { type: "zettel_table_cell", zettel_key: "cell-1", markDefs: [], children: [{ type: "zettel_span", zettel_key: "cell-span", text: "A", marks: [] }] },
-            { type: "zettel_table_cell", zettel_key: "cell-2", markDefs: [], children: [{ type: "zettel_span", zettel_key: "cell-span-2", text: "B", marks: [] }] },
+            { _type: "zettel_table_cell", _key: "cell-1", markDefs: [], children: [{ _type: "zettel_span", _key: "cell-span", text: "A", marks: [] }] },
+            { _type: "zettel_table_cell", _key: "cell-2", markDefs: [], children: [{ _type: "zettel_span", _key: "cell-span-2", text: "B", marks: [] }] },
           ],
         }],
       },
-      { type: "zettel_html", zettel_key: "html-1", value: "<script>should stay source</script>" },
+      { _type: "zettel_html", _key: "html-1", value: "<script>should stay source</script>" },
     ],
   };
 }
@@ -72,7 +71,7 @@ describe("Zettel Lexical state", () => {
     const exported = exportDocument(editor);
     expect(exported).toEqual(document);
     expect((exported.blocks[0] as any).markDefs).toBe((document.blocks[0] as any).markDefs);
-    expect((exported.blocks[0] as any).children[1].zettel_key).toBe("span-2");
+    expect((exported.blocks[0] as any).children[1]._key).toBe("span-2");
   });
 
   it("uses real editable TextNodes and exports meaningful text edits", () => {

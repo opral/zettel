@@ -104,14 +104,14 @@ try {
   await page.keyboard.type(" brave");
   await page.waitForTimeout(80);
   let edited = await doc();
-  assert.equal(edited.blocks[0].zettel_key, initial.blocks[0].zettel_key);
+  assert.equal(edited.blocks[0]._key, initial.blocks[0]._key);
   assert.equal(
     edited.blocks[0].children.map((c) => c.text ?? "").join(""),
     "Hello brave world.",
   );
   assert.equal(
-    edited.blocks[0].children[0].zettel_key,
-    initial.blocks[0].children[0].zettel_key,
+    edited.blocks[0].children[0]._key,
+    initial.blocks[0].children[0]._key,
   );
   checks.push("typing changes content and retains existing node identities");
   await caret("#editor p", 5);
@@ -213,11 +213,11 @@ try {
   edited = await doc();
   assert.equal(edited.blocks.length, 1);
   assert.ok(
-    edited.blocks[0].children.some((node) => node.type === "zettel_break"),
+    edited.blocks[0].children.some((node) => node._type === "zettel_break"),
   );
   assert.equal(
     edited.blocks[0].children
-      .filter((node) => node.type === "zettel_span")
+      .filter((node) => node._type === "zettel_span")
       .map((node) => node.text)
       .join(""),
     "Hello world.",

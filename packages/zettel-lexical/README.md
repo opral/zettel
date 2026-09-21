@@ -17,13 +17,13 @@ import {
 const editor = createZettelEditor();
 registerZettelLexicalPlugin(editor);
 loadDocument(editor, {
-  $schema: "https://zettel.dev/schema/1/schema.json",
+  _type: "zettel_doc",
   blocks: [{
-    type: "zettel_text",
-    zettel_key: "intro",
+    _type: "zettel_block",
+    _key: "intro",
     style: "normal",
     markDefs: [],
-    children: [{ type: "zettel_span", zettel_key: "hello", text: "Hello", marks: [] }],
+    children: [{ _type: "zettel_span", _key: "hello", text: "Hello", marks: [] }],
   }],
 });
 

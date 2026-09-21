@@ -13,12 +13,12 @@ import {
 const document = (): Document =>
   createDocument([
     {
-      type: "zettel_text",
-      zettel_key: "p",
+      _type: "zettel_block",
+      _key: "p",
       style: "normal",
       markDefs: [],
       children: [
-        { type: "zettel_span", zettel_key: "s", text: "Keep me", marks: [] },
+        { _type: "zettel_span", _key: "s", text: "Keep me", marks: [] },
       ],
     },
   ]);
@@ -26,7 +26,7 @@ describe("public binding boundaries", () => {
   it("splits linked text without duplicating document annotation keys", () => {
     const doc = document();
     const block = doc.blocks[0] as import("@opral/zettel-ast").TextBlock;
-    block.markDefs = [{ type: "zettel_link", zettel_key: "link", href: "https://example.com" }];
+    block.markDefs = [{ _type: "zettel_link", _key: "link", href: "https://example.com" }];
     block.children[0]!.marks = ["link"];
     const editor = createZettelEditor();
     registerZettelLexicalPlugin(editor);
@@ -39,7 +39,7 @@ describe("public binding boundaries", () => {
     const result = exportDocument(editor);
     expect(result.blocks).toHaveLength(2);
     const blocks = result.blocks as import("@opral/zettel-ast").TextBlock[];
-    expect(blocks[0]!.markDefs[0]!.zettel_key).not.toBe(blocks[1]!.markDefs[0]!.zettel_key);
+    expect(blocks[0]!.markDefs[0]!._key).not.toBe(blocks[1]!.markDefs[0]!._key);
     expect(blocks.map(b => b.markDefs[0]!.href)).toEqual(["https://example.com", "https://example.com"]);
     expect(block.markDefs).toHaveLength(1);
   });
@@ -49,7 +49,7 @@ describe("public binding boundaries", () => {
     loadDocument(editor, document());
     for (const invalid of [
       { ...document(), $schema: "https://example.com/future" },
-      { ...document(), blocks: [{ type: "zettel_text", zettel_key: "p" }] },
+      { ...document(), blocks: [{ _type: "zettel_block", _key: "p" }] },
     ]) {
       expect(() => loadDocument(editor, invalid as Document)).toThrow();
       expect(() => toLexicalState(invalid as Document)).toThrow();
@@ -64,13 +64,13 @@ describe("public binding boundaries", () => {
   it("preserves opaque extension atoms at their original inline and block locations", () => {
     const doc = document();
     (doc.blocks[0] as any).children.push({
-      type: "app_chip",
-      zettel_key: "chip",
+      _type: "app_chip",
+      _key: "chip",
       label: "hello",
     });
     doc.blocks.push({
-      type: "app_card",
-      zettel_key: "card",
+      _type: "app_card",
+      _key: "card",
       payload: { nested: [1, true] },
     });
     const editor = createZettelEditor();

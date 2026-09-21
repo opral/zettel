@@ -4,36 +4,36 @@ import type { CoreBlock } from "./schema.js";
 describe("core-only recursive types", () => {
 	it("keeps extension atoms out of core descendants at compile time", () => {
 		const core: CoreBlock = {
-			type: "zettel_text",
-			zettel_key: "p",
+			_type: "zettel_block",
+			_key: "p",
 			style: "normal",
 			markDefs: [],
 			children: [],
 		};
-		expect(core.type).toBe("zettel_text");
+		expect(core._type).toBe("zettel_block");
 	});
 
 	// These assignments are intentionally compile-time fixtures. The recursive
 	// CoreBlock aliases must reject application atoms in every container.
 	const badInline: CoreBlock = {
-		type: "zettel_text",
-		zettel_key: "p",
+		_type: "zettel_block",
+		_key: "p",
 		style: "normal",
 		markDefs: [],
 		// @ts-expect-error extension inline atom is not a CoreInline child
-		children: [{ type: "app_mention", zettel_key: "m", label: "x" }],
+		children: [{ _type: "app_mention", _key: "m", label: "x" }],
 	};
 	const badNested: CoreBlock = {
-		type: "zettel_list",
-		zettel_key: "l",
+		_type: "zettel_list",
+		_key: "l",
 		kind: "bullet",
 		spread: false,
 		items: [{
-			type: "zettel_list_item",
-			zettel_key: "i",
+			_type: "zettel_list_item",
+			_key: "i",
 			spread: false,
 			// @ts-expect-error extension block atom is not a CoreBlock list descendant
-			blocks: [{ type: "app_card", zettel_key: "c", label: "x" }],
+			blocks: [{ _type: "app_card", _key: "c", label: "x" }],
 		}],
 	};
 

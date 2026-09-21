@@ -37,5 +37,5 @@ test("supplied annotation keys cannot change another link destination or collide
 	expect(validateDocument(result.document).ok).toBe(true);
 	const block = result.document.blocks[0] as import("@opral/zettel-ast").TextBlock;
 	expect(block.markDefs.map((m) => m.href)).toEqual(["/one", "/two", "/three"]);
-	expect(new Set(block.markDefs.map((m) => m.zettel_key)).size).toBe(3);
+	expect(new Set(block.markDefs.map((m) => m._key)).size).toBe(3);
 });

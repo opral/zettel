@@ -5,8 +5,8 @@
   "description": "Canonical GFM document. Node keys are document-unique; marks reference definitions local to a text block or table cell.",
   "type": "object",
   "properties": {
-    "$schema": {
-      "const": "https://zettel.dev/schema/1/schema.json"
+    "_type": {
+      "const": "zettel_doc"
     },
     "blocks": {
       "type": "array",
@@ -17,7 +17,7 @@
     }
   },
   "required": [
-    "$schema",
+    "_type",
     "blocks"
   ],
   "additionalProperties": false,
@@ -25,10 +25,10 @@
     "link": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_link"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -40,20 +40,20 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "href"
       ],
       "additionalProperties": false,
-      "description": "Shared annotation referenced by its zettel_key from inline marks."
+      "description": "Shared annotation referenced by its _key from inline marks."
     },
     "span": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_span"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -70,8 +70,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "text",
         "marks"
       ],
@@ -81,10 +81,10 @@
     "break": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_break"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -97,8 +97,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "marks"
       ],
       "additionalProperties": false,
@@ -107,10 +107,10 @@
     "image": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_image"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -132,8 +132,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "src",
         "alt",
         "marks"
@@ -144,10 +144,10 @@
     "inlineHtml": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_html_inline"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -163,8 +163,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "value",
         "marks"
       ],
@@ -174,10 +174,10 @@
     "text": {
       "type": "object",
       "properties": {
-        "type": {
-          "const": "zettel_text"
+        "_type": {
+          "const": "zettel_block"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -208,8 +208,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "style",
         "children",
         "markDefs"
@@ -220,10 +220,10 @@
     "listItem": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_list_item"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -242,8 +242,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "blocks",
         "spread"
       ],
@@ -253,10 +253,10 @@
     "list": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_list"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -283,8 +283,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "kind",
         "spread",
         "items"
@@ -321,10 +321,10 @@
     "quote": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_quote"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -337,8 +337,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "blocks"
       ],
       "additionalProperties": false,
@@ -347,10 +347,10 @@
     "code": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_code"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -365,8 +365,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "code"
       ],
       "additionalProperties": false,
@@ -375,17 +375,17 @@
     "rule": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_rule"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         }
       },
       "required": [
-        "type",
-        "zettel_key"
+        "_type",
+        "_key"
       ],
       "additionalProperties": false,
       "description": "Thematic break."
@@ -393,10 +393,10 @@
     "tableCell": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_table_cell"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -416,8 +416,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "children",
         "markDefs"
       ],
@@ -427,10 +427,10 @@
     "tableRow": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_table_row"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -443,8 +443,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "cells"
       ],
       "additionalProperties": false,
@@ -453,10 +453,10 @@
     "table": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_table"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -481,8 +481,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "align",
         "rows"
       ],
@@ -492,10 +492,10 @@
     "html": {
       "type": "object",
       "properties": {
-        "type": {
+        "_type": {
           "const": "zettel_html"
         },
-        "zettel_key": {
+        "_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$"
         },
@@ -504,8 +504,8 @@
         }
       },
       "required": [
-        "type",
-        "zettel_key",
+        "_type",
+        "_key",
         "value"
       ],
       "additionalProperties": false,
@@ -569,17 +569,17 @@
   },
   "examples": [
     {
-      "$schema": "https://zettel.dev/schema/1/schema.json",
+      "_type": "zettel_doc",
       "blocks": [
         {
-          "type": "zettel_text",
-          "zettel_key": "p1",
+          "_type": "zettel_block",
+          "_key": "p1",
           "style": "normal",
           "markDefs": [],
           "children": [
             {
-              "type": "zettel_span",
-              "zettel_key": "s1",
+              "_type": "zettel_span",
+              "_key": "s1",
               "text": "Hello, world.",
               "marks": []
             }

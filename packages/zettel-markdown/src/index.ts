@@ -18,7 +18,7 @@ import type {
   TableCell,
   TableRow,
 } from "@opral/zettel-ast";
-import { assertDocument, generateKey, SCHEMA_URL } from "@opral/zettel-ast";
+import { assertDocument, generateKey } from "@opral/zettel-ast";
 import type {
   BlockContent,
   Definition,
@@ -49,7 +49,7 @@ type MarkDefinitionMap = Map<string, Link>;
 type MarkdownReferenceMap = Map<string, Pick<Definition, "url" | "title">>;
 
 const coreBlockTypes = new Set([
-  "zettel_text",
+  "zettel_block",
   "zettel_list",
   "zettel_quote",
   "zettel_code",
@@ -77,7 +77,7 @@ export function fromMarkdown(source: string): Document {
   const references: MarkdownReferenceMap = new Map();
   collectReferences(tree.children, references);
   const blocks = blocksFromMdast(tree.children, "blocks", references, source);
-  return { $schema: SCHEMA_URL, blocks } as Document;
+  return { _type: "zettel_doc", blocks } as Document;
 }
 
 /**
@@ -178,8 +178,8 @@ function rawHtmlBlock(
     if (startOffset === undefined || endOffset === undefined) return null;
     return {
       block: {
-        type: "zettel_html",
-        zettel_key: generateKey(),
+        _type: "zettel_html",
+        _key: generateKey(),
         value: source.slice(startOffset, endOffset),
       },
       nextIndex: end + 1,
@@ -286,8 +286,8 @@ function blockFromMdast(
     case "paragraph": {
       const converted = inlineFromMdast(node.children, path, references);
       return {
-        type: "zettel_text",
-        zettel_key: generateKey(),
+        _type: "zettel_block",
+        _key: generateKey(),
         style: "normal",
         children: converted.children,
         markDefs: converted.markDefs,
@@ -296,8 +296,8 @@ function blockFromMdast(
     case "heading": {
       const converted = inlineFromMdast(node.children, path, references);
       return {
-        type: "zettel_text",
-        zettel_key: generateKey(),
+        _type: "zettel_block",
+        _key: generateKey(),
         style: `h${node.depth}` as `h${1 | 2 | 3 | 4 | 5 | 6}`,
         children: converted.children,
         markDefs: converted.markDefs,
@@ -307,8 +307,8 @@ function blockFromMdast(
       return listFromMdast(node, path, references, source);
     case "blockquote":
       return {
-        type: "zettel_quote",
-        zettel_key: generateKey(),
+        _type: "zettel_quote",
+        _key: generateKey(),
         blocks: blocksFromMdast(
           node.children,
           `${path}.blocks`,
@@ -318,20 +318,20 @@ function blockFromMdast(
       };
     case "code":
       return {
-        type: "zettel_code",
-        zettel_key: generateKey(),
+        _type: "zettel_code",
+        _key: generateKey(),
         code: node.value,
         ...(node.lang ? { language: node.lang } : {}),
         ...(node.meta ? { meta: node.meta } : {}),
       };
     case "thematicBreak":
-      return { type: "zettel_rule", zettel_key: generateKey() };
+      return { _type: "zettel_rule", _key: generateKey() };
     case "table":
       return tableFromMdast(node, path, references);
     case "html":
       return {
-        type: "zettel_html",
-        zettel_key: generateKey(),
+        _type: "zettel_html",
+        _key: generateKey(),
         value: node.value,
       };
     case "definition":
@@ -352,8 +352,8 @@ function listFromMdast(
     listItemFromMdast(item, `${path}.items[${index}]`, references, source),
   );
   return {
-    type: "zettel_list",
-    zettel_key: generateKey(),
+    _type: "zettel_list",
+    _key: generateKey(),
     kind: node.ordered ? "number" : "bullet",
     ...(node.ordered ? { start: node.start ?? 1 } : {}),
     spread: (node.spread ?? false) || items.some((item) => item.spread),
@@ -374,8 +374,8 @@ function listItemFromMdast(
     source,
   );
   return {
-    type: "zettel_list_item" as const,
-    zettel_key: generateKey(),
+    _type: "zettel_list_item" as const,
+    _key: generateKey(),
     blocks,
     spread: node.spread ?? false,
     ...(node.checked === true || node.checked === false
@@ -406,8 +406,8 @@ function tableFromMdast(
     return tableRowFromMdast(row, `${path}.rows[${index}]`, references, width);
   });
   return {
-    type: "zettel_table",
-    zettel_key: generateKey(),
+    _type: "zettel_table",
+    _key: generateKey(),
     align: Array.from(
       { length: width },
       (_, index) => node.align?.[index] ?? null,
@@ -423,16 +423,16 @@ function tableRowFromMdast(
   width: number,
 ): CoreTableRow {
   return {
-    type: "zettel_table_row",
-    zettel_key: generateKey(),
+    _type: "zettel_table_row",
+    _key: generateKey(),
     // cmark-GFM pads short rows and ignores cells beyond the header width.
     cells: Array.from({ length: width }, (_, index) => {
       const cell = node.children[index];
       return cell
         ? tableCellFromMdast(cell, `${path}.cells[${index}]`, references)
         : {
-            type: "zettel_table_cell" as const,
-            zettel_key: generateKey(),
+            _type: "zettel_table_cell" as const,
+            _key: generateKey(),
             children: [],
             markDefs: [],
           };
@@ -447,8 +447,8 @@ function tableCellFromMdast(
 ): CoreTableCell {
   const converted = inlineFromMdast(node.children, path, references);
   return {
-    type: "zettel_table_cell",
-    zettel_key: generateKey(),
+    _type: "zettel_table_cell",
+    _key: generateKey(),
     children: converted.children,
     markDefs: converted.markDefs,
   };
@@ -492,8 +492,8 @@ function inlineNodeFromMdast(
       return node.value.length > 0
         ? [
             {
-              type: "zettel_span",
-              zettel_key: generateKey(),
+              _type: "zettel_span",
+              _key: generateKey(),
               text: node.value,
               marks: canonicalMarks(marks),
             },
@@ -526,8 +526,8 @@ function inlineNodeFromMdast(
     case "inlineCode":
       return [
         {
-          type: "zettel_span",
-          zettel_key: generateKey(),
+          _type: "zettel_span",
+          _key: generateKey(),
           text: node.value,
           marks: canonicalMarks(appendMark(marks, "code")),
         },
@@ -535,16 +535,16 @@ function inlineNodeFromMdast(
     case "break":
       return [
         {
-          type: "zettel_break",
-          zettel_key: generateKey(),
+          _type: "zettel_break",
+          _key: generateKey(),
           marks: canonicalMarks(marks),
         },
       ];
     case "image":
       return [
         {
-          type: "zettel_image",
-          zettel_key: generateKey(),
+          _type: "zettel_image",
+          _key: generateKey(),
           src: node.url,
           alt: node.alt ?? "",
           ...(node.title !== null && node.title !== undefined
@@ -584,8 +584,8 @@ function inlineNodeFromMdast(
       if (!reference) throw unsupportedImport(node.type, path);
       return [
         {
-          type: "zettel_image",
-          zettel_key: generateKey(),
+          _type: "zettel_image",
+          _key: generateKey(),
           src: reference.url,
           alt: node.alt ?? "",
           ...(reference.title !== null && reference.title !== undefined
@@ -598,8 +598,8 @@ function inlineNodeFromMdast(
     case "html":
       return [
         {
-          type: "zettel_html_inline",
-          zettel_key: generateKey(),
+          _type: "zettel_html_inline",
+          _key: generateKey(),
           value: node.value,
           marks: canonicalMarks(marks),
         },
@@ -646,23 +646,23 @@ function linkDefinitionFromUrl(
   const title = rawTitle ?? undefined;
   const signature = JSON.stringify([url, title]);
   const existing = definitions.get(signature);
-  if (existing) return existing.zettel_key;
+  if (existing) return existing._key;
   const definition: Link = {
-    type: "zettel_link",
-    zettel_key: generateKey(),
+    _type: "zettel_link",
+    _key: generateKey(),
     href: url,
     ...(title !== undefined ? { title } : {}),
   };
   definitions.set(signature, definition);
-  return definition.zettel_key;
+  return definition._key;
 }
 
 function mdastFromBlock(block: Block, path: string): BlockContent {
-  if (!coreBlockTypes.has(block.type))
-    throw unsupportedExport(block.type, path);
+  if (!coreBlockTypes.has(block._type))
+    throw unsupportedExport(block._type, path);
   const core = block as CoreBlock;
-  switch (core.type) {
-    case "zettel_text": {
+  switch (core._type) {
+    case "zettel_block": {
       const converted = inlineToMdast(
         core.children,
         core.markDefs,
@@ -769,7 +769,7 @@ function inlineToMdast(
   path: string,
 ): PhrasingContent[] {
   const definitions = new Map(
-    markDefs.map((definition) => [definition.zettel_key, definition]),
+    markDefs.map((definition) => [definition._key, definition]),
   );
   const output: PhrasingContent[] = [];
   const frames: Array<{ mark: string; children: PhrasingContent[] }> = [];
@@ -786,11 +786,11 @@ function inlineToMdast(
   };
 
   children.forEach((child, index) => {
-    if (!coreInlineTypes.has(child.type))
-      throw unsupportedExport(child.type, `${path}[${index}]`);
+    if (!coreInlineTypes.has(child._type))
+      throw unsupportedExport(child._type, `${path}[${index}]`);
     const core = child as CoreInline;
     const normalizedMarks = canonicalMarks(core.marks);
-    if (normalizedMarks.includes("code") && core.type !== "zettel_span") {
+    if (normalizedMarks.includes("code") && core._type !== "zettel_span") {
       throw unsupportedExport(
         "code mark on non-text inline",
         `${path}[${index}]`,
@@ -813,7 +813,7 @@ function inlineToMdast(
       core,
       definitions,
       `${path}[${index}]`,
-      children[index + 1]?.type === "zettel_html_inline",
+      children[index + 1]?._type === "zettel_html_inline",
     );
     const frame = frames.at(-1);
     if (frame) frame.children.push(node);
@@ -829,7 +829,7 @@ function inlineNodeToMdast(
   path: string,
   preserveTrailingLineEnding = false,
 ): PhrasingContent {
-  if (inline.type === "zettel_span") {
+  if (inline._type === "zettel_span") {
     const core = inline;
     if (core.text.length === 0)
       throw new MarkdownConversionError(
@@ -853,8 +853,8 @@ function inlineNodeToMdast(
       ? { type: "inlineCode", value: textValue }
       : { type: "text", value: textValue };
   }
-  if (inline.type === "zettel_break") return { type: "break" };
-  if (inline.type === "zettel_image") {
+  if (inline._type === "zettel_break") return { type: "break" };
+  if (inline._type === "zettel_image") {
     return {
       type: "image",
       url: inline.src,
@@ -862,7 +862,7 @@ function inlineNodeToMdast(
       title: inline.title ?? null,
     };
   }
-  if (inline.type === "zettel_html_inline")
+  if (inline._type === "zettel_html_inline")
     return { type: "html", value: inline.value };
   throw unsupportedExport("unknown core inline", path);
 }

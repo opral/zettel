@@ -45,17 +45,17 @@ function semanticDocument(document) {
 }
 
 function semanticBlock(block) {
-  switch (block.type) {
-    case "zettel_text":
+  switch (block._type) {
+    case "zettel_block":
       return {
-        type: block.type,
+        _type: block._type,
         style: block.style,
         children: semanticChildren(block.children, block.markDefs),
       };
     case "zettel_list": {
       const loose = block.spread || block.items.some((item) => item.spread);
       return {
-        type: block.type,
+        _type: block._type,
         kind: block.kind,
         start: block.start ?? null,
         spread: loose,
@@ -68,21 +68,21 @@ function semanticBlock(block) {
     }
     case "zettel_quote":
       return {
-        type: block.type,
+        _type: block._type,
         blocks: block.blocks.map((child) => semanticBlock(child)),
       };
     case "zettel_code":
       return {
-        type: block.type,
+        _type: block._type,
         code: block.code,
         language: block.language ?? null,
         meta: block.meta ?? null,
       };
     case "zettel_rule":
-      return { type: block.type };
+      return { _type: block._type };
     case "zettel_table":
       return {
-        type: block.type,
+        _type: block._type,
         align: block.align,
         rows: block.rows.map((row) =>
           row.cells.map((cell) => ({
@@ -94,7 +94,7 @@ function semanticBlock(block) {
       // remark-stringify terminates a final raw HTML block with one LF. That
       // delimiter is outside the authored block and is not HTML content.
       return {
-        type: block.type,
+        _type: block._type,
         value: block.value.replace(/\n$/, ""),
       };
     default:
@@ -108,8 +108,8 @@ function semanticChildren(children, markDefs) {
     const current = semanticInline(child, markDefs);
     const previous = result.at(-1);
     if (
-      previous?.type === "zettel_span" &&
-      current.type === "zettel_span" &&
+      previous?._type === "zettel_span" &&
+      current._type === "zettel_span" &&
       JSON.stringify(previous.marks) === JSON.stringify(current.marks)
     ) {
       previous.text += current.text;
@@ -123,35 +123,35 @@ function semanticChildren(children, markDefs) {
 function semanticInline(inline, markDefs) {
   const marks = inline.marks.map((mark) => {
     const definition = markDefs.find(
-      (candidate) => candidate.zettel_key === mark,
+      (candidate) => candidate._key === mark,
     );
     return definition
       ? { type: "link", href: definition.href, title: definition.title ?? null }
       : mark;
   });
-  if (inline.type === "zettel_span") {
+  if (inline._type === "zettel_span") {
     return {
-      type: inline.type,
+      _type: inline._type,
       text: inline.marks.includes("code")
         ? inline.text
         : inline.text.replace(/\n/g, " "),
       marks,
     };
   }
-  if (inline.type === "zettel_break") {
-    return { type: inline.type, marks };
+  if (inline._type === "zettel_break") {
+    return { _type: inline._type, marks };
   }
-  if (inline.type === "zettel_image") {
+  if (inline._type === "zettel_image") {
     return {
-      type: inline.type,
+      _type: inline._type,
       src: inline.src,
       alt: inline.alt,
       title: inline.title ?? null,
       marks,
     };
   }
-  if (inline.type === "zettel_html_inline") {
-    return { type: inline.type, value: inline.value, marks };
+  if (inline._type === "zettel_html_inline") {
+    return { _type: inline._type, value: inline.value, marks };
   }
   return inline;
 }

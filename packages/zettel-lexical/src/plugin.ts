@@ -160,11 +160,11 @@ function nearestAncestor<T extends LexicalNode>(node: LexicalNode, ctor: new (..
 }
 
 function linkHrefFor(block: ZettelTextBlockNode | ZettelTableCellNode, marks: string[]): string | undefined {
-  return marks.map((mark) => block.markDefs.find((definition) => definition.zettel_key === mark)?.href).find(Boolean);
+  return marks.map((mark) => block.markDefs.find((definition) => definition._key === mark)?.href).find(Boolean);
 }
 
 function newSpanWithMarks(marks: string[], text: string, block: ZettelTextBlockNode | ZettelTableCellNode): ZettelSpanNode {
-  const result = new ZettelSpanNode({ type: "zettel_span", zettel_key: generateKey(), text, marks });
+  const result = new ZettelSpanNode({ _type: "zettel_span", _key: generateKey(), text, marks });
   result.setLinkHref(linkHrefFor(block, result.toZettel().marks));
   return result;
 }
@@ -172,9 +172,9 @@ function newSpanWithMarks(marks: string[], text: string, block: ZettelTextBlockN
 function cloneMarkDefs(markDefs: Link[]): { markDefs: Link[]; marks: Map<string, string> } {
   const marks = new Map<string, string>();
   const cloned = markDefs.map((definition) => {
-    const zettel_key = generateKey();
-    marks.set(definition.zettel_key, zettel_key);
-    return { ...definition, zettel_key };
+    const _key = generateKey();
+    marks.set(definition._key, _key);
+    return { ...definition, _key };
   });
   return { markDefs: cloned, marks };
 }
@@ -224,8 +224,8 @@ function splitListItem(item: ZettelListItemNode, block: ZettelTextBlockNode, anc
   const blockIndex = itemBlocks.indexOf(block);
   const followingBlocks = itemBlocks.slice(blockIndex + 1);
   const nextItem = new ZettelListItemNode({
-    type: "zettel_list_item",
-    zettel_key: generateKey(),
+    _type: "zettel_list_item",
+    _key: generateKey(),
     spread: item.spread,
     ...(item.checked === undefined ? {} : { checked: false }),
   });
@@ -264,7 +264,7 @@ export function setZettelListItemChecked(editor: LexicalEditor, zettelKey: strin
   let changed = false;
   editor.update(() => {
     const visit = (node: any): void => {
-      if (node instanceof ZettelListItemNode && node.zettel_key === zettelKey) {
+      if (node instanceof ZettelListItemNode && node._key === zettelKey) {
         const writable = node.getWritable() as ZettelListItemNode;
         writable.checked = checked ?? !Boolean(writable.checked);
         changed = true;

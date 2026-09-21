@@ -69,7 +69,7 @@ export function validateDocument(
 			for (const [type, callback] of Object.entries(options[kind] ?? {})) {
 				if (!type || type.startsWith("zettel_") || typeof callback !== "function")
 					error(`options.${kind}.${type}`, "Invalid or reserved extension registration");
-				else extensionSchemas[kind].push({ type: "object", properties: { type: { const: type } } });
+				else extensionSchemas[kind].push({ type: "object", properties: { _type: { const: type } } });
 			}
 		}
 		if (errors.length) return { ok: false, errors };
@@ -87,13 +87,13 @@ export function validateDocument(
 			};
 		const keys = new Set<string>();
 		const register = (n: any, path: string): void => {
-			if (keys.has(n.zettel_key)) error(`${path}.zettel_key`, "Duplicate document key");
-			keys.add(n.zettel_key);
+			if (keys.has(n._key)) error(`${path}._key`, "Duplicate document key");
+			keys.add(n._key);
 		};
 		const visit = (n: any, path: string, kind: "blocks" | "inline" = "blocks"): void => {
 			register(n, path);
-			if (!n.type.startsWith("zettel_")) {
-				const callback = options[kind]?.[n.type];
+			if (!n._type.startsWith("zettel_")) {
+				const callback = options[kind]?.[n._type];
 				if (!callback) {
 					error(path, "Unregistered extension");
 					return;
@@ -104,16 +104,16 @@ export function validateDocument(
 				else for (const message of result) error(path, message);
 				return;
 			}
-			if (n.type === "zettel_text" || n.type === "zettel_table_cell") {
+			if (n._type === "zettel_block" || n._type === "zettel_table_cell") {
 				const refs = new Set<string>();
 				n.markDefs.forEach((def: any, i: number) => {
 					register(def, `${path}.markDefs[${i}]`);
-					refs.add(def.zettel_key);
-					if (decorators.has(def.zettel_key)) error(path, "Annotation key collides with decorator");
+					refs.add(def._key);
+					if (decorators.has(def._key)) error(path, "Annotation key collides with decorator");
 				});
 				n.children.forEach((child: any, i: number) => {
 					const childPath = `${path}.children[${i}]`;
-					if (child.type.startsWith("zettel_")) {
+					if (child._type.startsWith("zettel_")) {
 						const marks: string[] = child.marks;
 						if (new Set(marks).size !== marks.length) error(childPath, "Duplicate mark");
 						if (marks.filter((m) => refs.has(m)).length > 1)
@@ -124,7 +124,7 @@ export function validateDocument(
 					}
 					visit(child, childPath, "inline");
 				});
-			} else if (n.type === "zettel_table") {
+			} else if (n._type === "zettel_table") {
 				n.rows.forEach((row: any, i: number) => {
 					register(row, `${path}.rows[${i}]`);
 					if (row.cells.length !== n.align.length)
@@ -133,9 +133,9 @@ export function validateDocument(
 						visit(cell, `${path}.rows[${i}].cells[${j}]`)
 					);
 				});
-			} else if (n.type === "zettel_list")
+			} else if (n._type === "zettel_list")
 				n.items.forEach((item: any, i: number) => visit(item, `${path}.items[${i}]`));
-			else if (n.type === "zettel_list_item" || n.type === "zettel_quote")
+			else if (n._type === "zettel_list_item" || n._type === "zettel_quote")
 				n.blocks.forEach((block: any, i: number) => visit(block, `${path}.blocks[${i}]`));
 		};
 		(value as Document).blocks.forEach((n, i) => visit(n, `$.blocks[${i}]`));

@@ -7,7 +7,6 @@ import {
 } from "lexical";
 import {
   assertDocument,
-  SCHEMA_URL,
   type ValidationOptions,
 } from "@opral/zettel-ast";
 import { createDocument, type Document } from "./types.js";
@@ -29,9 +28,9 @@ export function assertEditorDocument(
   if (
     !value ||
     typeof value !== "object" ||
-    Object.getOwnPropertyDescriptor(value, "$schema")?.value !== SCHEMA_URL
+    Object.getOwnPropertyDescriptor(value, "_type")?.value !== "zettel_doc"
   ) {
-    throw new Error("Unsupported Zettel schema");
+    throw new Error("Unsupported Zettel document type");
   }
   const validators: NonNullable<ValidationOptions["blocks"]> = {};
   const seen = new WeakSet<object>();
@@ -39,7 +38,7 @@ export function assertEditorDocument(
     if (!node || typeof node !== "object" || seen.has(node)) return;
     seen.add(node);
     const descriptors = Object.getOwnPropertyDescriptors(node);
-    const type: unknown = descriptors.type?.value;
+    const type: unknown = descriptors._type?.value;
     if (typeof type === "string" && !type.startsWith("zettel_")) {
       Object.defineProperty(validators, type, {
         value: () => [],

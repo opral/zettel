@@ -23,7 +23,7 @@ and `tel` URLs; images permit `http` and `https` URLs. Relative URLs and fragmen
 enabled deliberately with `{ allowDataImages: true }`.
 
 The shared content stylesheet is available as `@opral/zettel-html/style.css`.
-It uses the stable `zettel`, `zettel_text`, `zettel_list`, `zettel_list_item`,
+It uses the stable `zettel`, `zettel_block`, `zettel_list`, `zettel_list_item`,
 `zettel_quote`, `zettel_code`, `zettel_rule`, `zettel_table`, `zettel_image`,
 and `zettel_html` classes used by static output and the Lexical integration.
 

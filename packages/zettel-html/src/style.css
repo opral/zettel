@@ -24,17 +24,17 @@
 	box-sizing: inherit;
 }
 
-.zettel_text {
+.zettel_block {
 	margin: 0 0 1em;
 	white-space: normal;
 }
 
-.zettel h1.zettel_text,
-.zettel h2.zettel_text,
-.zettel h3.zettel_text,
-.zettel h4.zettel_text,
-.zettel h5.zettel_text,
-.zettel h6.zettel_text {
+.zettel h1.zettel_block,
+.zettel h2.zettel_block,
+.zettel h3.zettel_block,
+.zettel h4.zettel_block,
+.zettel h5.zettel_block,
+.zettel h6.zettel_block {
 	line-height: 1.25;
 }
 
@@ -69,8 +69,8 @@
 	margin-block-start: 0.35em;
 }
 
-.zettel_list[data-tight="true"] > .zettel_list_item > .zettel_text,
-.zettel_list_item[data-tight="true"] > .zettel_text {
+.zettel_list[data-tight="true"] > .zettel_list_item > .zettel_block,
+.zettel_list_item[data-tight="true"] > .zettel_block {
 	margin-bottom: 0;
 }
 

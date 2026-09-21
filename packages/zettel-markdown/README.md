@@ -24,6 +24,6 @@ so content is never silently discarded. Likewise,
 export rejects unregistered extension blocks and inline nodes, missing link
 definitions, invalid tables, and marks that Markdown cannot represent.
 
-Markdown conversion creates fresh `zettel_key` values. Link definitions are
+Markdown conversion creates fresh `_key` values. Link definitions are
 local to each text block or table cell, and raw HTML is retained as inert
 source in `zettel_html` or `zettel_html_inline` nodes.

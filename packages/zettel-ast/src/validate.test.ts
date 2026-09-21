@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import {
-	SCHEMA_URL,
 	createDocument,
 	createDocumentSchema,
 	documentSchema,
@@ -10,19 +9,19 @@ import {
 	type Document,
 } from "./index.js";
 const paragraph = () => ({
-	type: "zettel_text",
-	zettel_key: "p",
+	_type: "zettel_block",
+	_key: "p",
 	style: "normal",
-	markDefs: [{ type: "zettel_link", zettel_key: "link", href: "https://example.com" }],
-	children: [{ type: "zettel_span", zettel_key: "s", text: "Hello", marks: ["link", "strong"] }],
+	markDefs: [{ _type: "zettel_link", _key: "link", href: "https://example.com" }],
+	children: [{ _type: "zettel_span", _key: "s", text: "Hello", marks: ["link", "strong"] }],
 });
-const doc = (): any => ({ $schema: SCHEMA_URL, blocks: [paragraph()] });
+const doc = (): any => ({ _type: "zettel_doc", blocks: [paragraph()] });
 describe("Zettel document validation", () => {
 	it("validates shared marks and empty documents", () => {
 		const d = doc();
 		d.blocks[0].children.push({
-			type: "zettel_span",
-			zettel_key: "s2",
+			_type: "zettel_span",
+			_key: "s2",
 			text: " world",
 			marks: ["link"],
 		});
@@ -30,13 +29,13 @@ describe("Zettel document validation", () => {
 		expect(validateDocument(createDocument()).ok).toBe(true);
 		expect(generateKey()).toMatch(/^[A-Za-z0-9_-]+$/);
 	});
-	it("requires the exact schema identifier, own required fields, and closed objects", () => {
-		for (const d of [{ blocks: [] }, { $schema: "other", blocks: [] }, { ...doc(), version: 1 }])
+	it("requires the document discriminator, own required fields, and closed objects", () => {
+		for (const d of [{ blocks: [] }, { _type: "other", blocks: [] }, { $schema: "https://zettel.dev/schema/1/schema.json", blocks: [] }, { ...doc(), version: 1 }, { ...doc(), _key: "root" }, { _type: "zettel_doc", blocks: [{ ...paragraph(), _type: "zettel_text" }] }, { type: "zettel_doc", content: [] }])
 			expect(validateDocument(d).ok).toBe(false);
 		const old = Object.getOwnPropertyDescriptor(Object.prototype, "blocks");
 		try {
 			Object.defineProperty(Object.prototype, "blocks", { value: [], configurable: true });
-			expect(validateDocument({ $schema: SCHEMA_URL }).ok).toBe(false);
+			expect(validateDocument({ _type: "zettel_doc" }).ok).toBe(false);
 		} finally {
 			if (old) Object.defineProperty(Object.prototype, "blocks", old);
 			else delete (Object.prototype as any).blocks;
@@ -44,11 +43,11 @@ describe("Zettel document validation", () => {
 	});
 	it("rejects duplicate identity, duplicate/unresolved marks and multiple links", () => {
 		const d = doc();
-		d.blocks[0].children[0].zettel_key = "p";
+		d.blocks[0].children[0]._key = "p";
 		expect(validateDocument(d).ok).toBe(false);
 		for (const marks of [["bad"], ["strong", "strong"], ["link", "two"]]) {
 			const v = doc();
-			v.blocks[0].markDefs.push({ type: "zettel_link", zettel_key: "two", href: "" });
+			v.blocks[0].markDefs.push({ _type: "zettel_link", _key: "two", href: "" });
 			v.blocks[0].children[0].marks = marks;
 			expect(validateDocument(v).ok).toBe(false);
 		}
@@ -56,30 +55,30 @@ describe("Zettel document validation", () => {
 	it("supports links around images and hard breaks", () => {
 		const d = doc();
 		d.blocks[0].children.push(
-			{ type: "zettel_image", zettel_key: "i", src: "image.png", alt: "", marks: ["link"] },
-			{ type: "zettel_break", zettel_key: "b", marks: [] }
+			{ _type: "zettel_image", _key: "i", src: "image.png", alt: "", marks: ["link"] },
+			{ _type: "zettel_break", _key: "b", marks: [] }
 		);
 		expect(validateDocument(d).ok).toBe(true);
 	});
 	it("supports mixed tasks, empty items, and nested blocks", () => {
 		const d = {
-			$schema: SCHEMA_URL,
+			_type: "zettel_doc",
 			blocks: [
 				{
-					type: "zettel_list",
-					zettel_key: "l",
+					_type: "zettel_list",
+					_key: "l",
 					kind: "number",
 					start: 3,
 					spread: true,
 					items: [
 						{
-							type: "zettel_list_item",
-							zettel_key: "a",
+							_type: "zettel_list_item",
+							_key: "a",
 							spread: false,
 							checked: false,
 							blocks: [paragraph()],
 						},
-						{ type: "zettel_list_item", zettel_key: "b", spread: false, blocks: [] },
+						{ _type: "zettel_list_item", _key: "b", spread: false, blocks: [] },
 					],
 				},
 			],
@@ -90,17 +89,17 @@ describe("Zettel document validation", () => {
 	});
 	it("checks table shape beyond JSON Schema", () => {
 		const d = {
-			$schema: SCHEMA_URL,
+			_type: "zettel_doc",
 			blocks: [
 				{
-					type: "zettel_table",
-					zettel_key: "t",
+					_type: "zettel_table",
+					_key: "t",
 					align: ["left", null],
 					rows: [
 						{
-							type: "zettel_table_row",
-							zettel_key: "r",
-							cells: [{ type: "zettel_table_cell", zettel_key: "c", children: [], markDefs: [] }],
+							_type: "zettel_table_row",
+							_key: "r",
+							cells: [{ _type: "zettel_table_cell", _key: "c", children: [], markDefs: [] }],
 						},
 					],
 				},
@@ -123,15 +122,15 @@ describe("Zettel document validation", () => {
 		const sparse: any[] = [];
 		sparse.length = 1;
 		for (const blocks of [sparse, [undefined], [NaN]])
-			expect(validateDocument({ $schema: SCHEMA_URL, blocks }).ok).toBe(false);
+			expect(validateDocument({ _type: "zettel_doc", blocks }).ok).toBe(false);
 		const cycle: any = {};
 		cycle.x = cycle;
 		expect(validateDocument(cycle).ok).toBe(false);
 	});
 	it("registers extensions explicitly and isolates callbacks", () => {
 		const d = {
-			$schema: SCHEMA_URL,
-			blocks: [{ type: "app_card", zettel_key: "x", label: "before" }],
+			_type: "zettel_doc",
+			blocks: [{ _type: "app_card", _key: "x", label: "before" }],
 		};
 		expect(validateDocument(d).ok).toBe(false);
 		expect(
@@ -154,11 +153,11 @@ describe("Zettel document validation", () => {
 				{
 					type: "object",
 					properties: {
-						type: { const: "app_card" },
-						zettel_key: { type: "string" },
+						_type: { const: "app_card" },
+						_key: { type: "string" },
 						label: { type: "string" },
 					},
-					required: ["type", "zettel_key", "label"],
+					required: ["_type", "_key", "label"],
 					additionalProperties: false,
 				},
 			],
@@ -166,12 +165,12 @@ describe("Zettel document validation", () => {
 		const check = new Ajv2020({ strict: false }).compile(schema);
 		expect(
 			check({
-				$schema: SCHEMA_URL,
+				_type: "zettel_doc",
 				blocks: [
 					{
-						type: "zettel_quote",
-						zettel_key: "q",
-						blocks: [{ type: "app_card", zettel_key: "c", label: "ok" }],
+						_type: "zettel_quote",
+						_key: "q",
+						blocks: [{ _type: "app_card", _key: "c", label: "ok" }],
 					},
 				],
 			})

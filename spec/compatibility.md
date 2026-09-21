@@ -1,6 +1,6 @@
 # Compatibility and extensions
 
-The versioned schema identifier is the authority for interpreting a document. Do not silently reinterpret an unrecognized schema version. Preserve the original JSON and open it read-only until a suitable adapter is installed. This release intentionally provides no compatibility with previous Zettel drafts or package-root APIs.
+Documents identify themselves with `_type: "zettel_doc"`; they carry no schema URL or version. The host selects the bundled schema/application profile. Reject invalid roots and unsupported structures rather than silently reinterpreting them. This release intentionally provides no compatibility with previous Zettel drafts or package-root APIs.
 
 Known core nodes are closed objects. Extension names must not start with `zettel_`. The schema exposes `extensionBlock` and `extensionInline` slots recursively. `createDocumentSchema({blocks:[...schemas],inline:[...schemas]})` builds an application profile from those slots, while `validateDocument(value,{blocks:{app_card:validateCard},inline:{...}})` registers runtime payload validators. The host must use matching schema and validator registrations. A schema definition alone cannot provide rendering, editing, or Markdown semantics.
 

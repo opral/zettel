@@ -1,5 +1,5 @@
 import { parseFragment } from "parse5";
-import { assertDocument, generateKey, validateDocument, SCHEMA_URL } from "@opral/zettel-ast";
+import { assertDocument, generateKey, validateDocument } from "@opral/zettel-ast";
 import type {
 	Block,
 	Break,
@@ -140,19 +140,19 @@ function extensionValidationOptions(options: HtmlImportOptions): {
 function knownNodeKeys(node: unknown, keys: Set<string>): void {
 	if (!node || typeof node !== "object" || Array.isArray(node)) return;
 	const value = node as Record<string, unknown>;
-	if (typeof value.zettel_key === "string") keys.add(value.zettel_key);
-	if (typeof value.type !== "string") return;
-	if (value.type === "zettel_text" || value.type === "zettel_table_cell") {
+	if (typeof value._key === "string") keys.add(value._key);
+	if (typeof value._type !== "string") return;
+	if (value._type === "zettel_block" || value._type === "zettel_table_cell") {
 		if (Array.isArray(value.markDefs)) for (const def of value.markDefs) knownNodeKeys(def, keys);
 		if (Array.isArray(value.children))
 			for (const child of value.children) knownNodeKeys(child, keys);
-	} else if (value.type === "zettel_table") {
+	} else if (value._type === "zettel_table") {
 		if (Array.isArray(value.rows)) for (const row of value.rows) knownNodeKeys(row, keys);
-	} else if (value.type === "zettel_table_row") {
+	} else if (value._type === "zettel_table_row") {
 		if (Array.isArray(value.cells)) for (const cell of value.cells) knownNodeKeys(cell, keys);
-	} else if (value.type === "zettel_list") {
+	} else if (value._type === "zettel_list") {
 		if (Array.isArray(value.items)) for (const item of value.items) knownNodeKeys(item, keys);
-	} else if (value.type === "zettel_list_item" || value.type === "zettel_quote") {
+	} else if (value._type === "zettel_list_item" || value._type === "zettel_quote") {
 		if (Array.isArray(value.blocks)) for (const block of value.blocks) knownNodeKeys(block, keys);
 	}
 }
@@ -165,18 +165,18 @@ function acceptHandlerNode(
 ): value is Block | Inline {
 	const candidate = inline
 		? {
-				$schema: SCHEMA_URL,
+				_type: "zettel_doc",
 				blocks: [
 					{
-						type: "zettel_text",
-						zettel_key: generateKey(),
+						_type: "zettel_block",
+						_key: generateKey(),
 						style: "normal",
 						children: [value],
 						markDefs: [],
 					},
 				],
 			}
-		: { $schema: SCHEMA_URL, blocks: [value] };
+		: { _type: "zettel_doc", blocks: [value] };
 	const result = validateDocument(candidate, extensionValidationOptions(context.options));
 	if (!result.ok) {
 		addErrorDiagnostic(
@@ -259,7 +259,7 @@ function keyFor(node: HtmlNode | undefined, context: ParseContext, path: string)
 }
 function exportKey(value: unknown): string {
 	if (typeof value !== "string" || !validKey(value))
-		throw new Error("Zettel HTML export requires valid zettel_key values.");
+		throw new Error("Zettel HTML export requires valid _key values.");
 	return value;
 }
 
@@ -306,22 +306,22 @@ function renderMarks(
 			result = `<${tag}>${result}</${tag}>`;
 			continue;
 		}
-		const definition = markDefs.find((candidate) => candidate.zettel_key === mark);
+		const definition = markDefs.find((candidate) => candidate._key === mark);
 		if (!definition) throw new Error(`Cannot export unknown inline mark '${mark}'.`);
 		const href = safeUrl(definition.href, "link", options);
 		const hrefAttribute = href === undefined ? "" : ` href="${escapeAttribute(href)}"`;
 		const title =
 			definition.title === undefined ? "" : ` title="${escapeAttribute(definition.title)}"`;
-		result = `<a data-zettel-mark-key="${escapeAttribute(exportKey(definition.zettel_key))}"${hrefAttribute}${title}>${result}</a>`;
+		result = `<a data-zettel-mark-key="${escapeAttribute(exportKey(definition._key))}"${hrefAttribute}${title}>${result}</a>`;
 	}
 	return result;
 }
 
 function renderInline(inline: Inline, markDefs: Link[], options: HtmlExportOptions): string {
-	const key = exportKey(inline.zettel_key);
+	const key = exportKey(inline._key);
 	const value = inline as AstSpan | AstBreak | AstImage | AstInlineHtml;
 	let result: string;
-	switch (value.type) {
+	switch (value._type) {
 		case "zettel_span":
 			if (!value.text.length) throw new Error("Zettel span text must be nonempty.");
 			result = `<span${dataKey(key)}>${escapeText(value.text)}</span>`;
@@ -340,9 +340,9 @@ function renderInline(inline: Inline, markDefs: Link[], options: HtmlExportOptio
 			result = `<code class="zettel_html_inline" data-zettel-readonly="true"${dataKey(key)}>${escapeText(value.value)}</code>`;
 			break;
 		default: {
-			const handler = options.extensions?.[inline.type];
+			const handler = options.extensions?.[inline._type];
 			if (!handler?.toHtml)
-				throw new Error(`No HTML extension handler registered for '${inline.type}'.`);
+				throw new Error(`No HTML extension handler registered for '${inline._type}'.`);
 			result = handler.toHtml(inline as Extension, { inline: true });
 			break;
 		}
@@ -354,7 +354,7 @@ function renderInline(inline: Inline, markDefs: Link[], options: HtmlExportOptio
 
 function linkMark(inline: Inline, markDefs: Link[]): string | undefined {
 	const marks = "marks" in inline && Array.isArray(inline.marks) ? (inline.marks as string[]) : [];
-	return marks.find((mark) => markDefs.some((definition) => definition.zettel_key === mark));
+	return marks.find((mark) => markDefs.some((definition) => definition._key === mark));
 }
 
 /** Keep a contiguous link selection in one anchor while retaining each child span. */
@@ -395,7 +395,7 @@ function renderInlineChildren(
 
 function renderText(block: TextBlock, options: HtmlExportOptions): string {
 	const tag = block.style === "normal" ? "p" : block.style;
-	return `<${tag} class="zettel_text"${dataKey(exportKey(block.zettel_key))}>${renderInlineChildren(block.children, block.markDefs, options)}</${tag}>`;
+	return `<${tag} class="zettel_block"${dataKey(exportKey(block._key))}>${renderInlineChildren(block.children, block.markDefs, options)}</${tag}>`;
 }
 function renderListItem(item: ListItem, options: HtmlExportOptions): string {
 	const checked =
@@ -406,7 +406,7 @@ function renderListItem(item: ListItem, options: HtmlExportOptions): string {
 			: `<input type="checkbox" disabled${item.checked ? " checked" : ""}>`;
 	const spread = item.spread ? ' data-spread="true"' : ' data-tight="true"';
 	const taskClass = item.checked === undefined ? "" : " zettel_task_item";
-	return `<li class="zettel_list_item${taskClass}"${dataKey(exportKey(item.zettel_key))}${checked}${spread}>${checkbox}${item.blocks
+	return `<li class="zettel_list_item${taskClass}"${dataKey(exportKey(item._key))}${checked}${spread}>${checkbox}${item.blocks
 		.map((child) => renderBlock(child, options))
 		.join("")}</li>`;
 }
@@ -414,22 +414,22 @@ function renderTable(table: Table, options: HtmlExportOptions): string {
 	const rows = table.rows
 		.map(
 			(row, rowIndex) =>
-				`<tr${dataKey(exportKey(row.zettel_key))}>${row.cells
+				`<tr${dataKey(exportKey(row._key))}>${row.cells
 					.map((cell, columnIndex) => {
 						const tag = rowIndex === 0 ? "th" : "td";
 						const align = table.align[columnIndex];
 						const alignment = align ? ` align="${align}"` : "";
-						return `<${tag}${dataKey(exportKey(cell.zettel_key))}${alignment}>${renderInlineChildren(cell.children, cell.markDefs, options)}</${tag}>`;
+						return `<${tag}${dataKey(exportKey(cell._key))}${alignment}>${renderInlineChildren(cell.children, cell.markDefs, options)}</${tag}>`;
 					})
 					.join("")}</tr>`
 		)
 		.join("");
 	const header = table.rows.length ? rows.split("</tr>")[0] + "</tr>" : "";
 	const body = table.rows.length ? rows.slice(header.length) : "";
-	return `<table class="zettel_table"${dataKey(exportKey(table.zettel_key))}>${header ? `<thead>${header}</thead>` : ""}${body ? `<tbody>${body}</tbody>` : ""}</table>`;
+	return `<table class="zettel_table"${dataKey(exportKey(table._key))}>${header ? `<thead>${header}</thead>` : ""}${body ? `<tbody>${body}</tbody>` : ""}</table>`;
 }
 function renderBlock(block: Block, options: HtmlExportOptions): string {
-	const key = exportKey(block.zettel_key);
+	const key = exportKey(block._key);
 	const value = block as
 		| AstTextBlock
 		| AstList
@@ -439,8 +439,8 @@ function renderBlock(block: Block, options: HtmlExportOptions): string {
 		| AstRule
 		| AstTable
 		| AstHtml;
-	switch (value.type) {
-		case "zettel_text":
+	switch (value._type) {
+		case "zettel_block":
 			return renderText(value, options);
 		case "zettel_list": {
 			const tag = value.kind === "number" ? "ol" : "ul";
@@ -466,9 +466,9 @@ function renderBlock(block: Block, options: HtmlExportOptions): string {
 		case "zettel_html":
 			return `<pre class="zettel_html" data-zettel-readonly="true"${dataKey(key)}><code>${escapeText(value.value)}</code></pre>`;
 		default: {
-			const handler = options.extensions?.[block.type];
+			const handler = options.extensions?.[block._type];
 			if (!handler?.toHtml)
-				throw new Error(`No HTML extension handler registered for '${block.type}'.`);
+				throw new Error(`No HTML extension handler registered for '${block._type}'.`);
 			return handler.toHtml(block as Extension, { inline: false });
 		}
 	}
@@ -567,8 +567,8 @@ function parseInlineNodes(
 		if (node.nodeName === "#text") {
 			if (node.value)
 				result.push({
-					type: "zettel_span",
-					zettel_key: keyFor(undefined, context, `${path}[${index}]`),
+					_type: "zettel_span",
+					_key: keyFor(undefined, context, `${path}[${index}]`),
 					text: node.value,
 					marks: [...inherited],
 				});
@@ -588,8 +588,8 @@ function parseInlineNodes(
 				if (acceptHandlerNode(value, true, context, currentPath)) result.push(value as Inline);
 				else
 					result.push({
-						type: "zettel_html_inline",
-						zettel_key: keyFor(node, context, currentPath),
+						_type: "zettel_html_inline",
+						_key: keyFor(node, context, currentPath),
 						value: cleanRaw(node),
 						marks: [...inherited],
 					});
@@ -598,8 +598,8 @@ function parseInlineNodes(
 		}
 		if (node.tagName === "br") {
 			result.push({
-				type: "zettel_break",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_break",
+				_key: keyFor(node, context, currentPath),
 				marks: [...inherited],
 			});
 			continue;
@@ -610,16 +610,16 @@ function parseInlineNodes(
 				const alt = attr(node, "alt") ?? "";
 				if (alt)
 					result.push({
-						type: "zettel_span",
-						zettel_key: keyFor(undefined, context, currentPath),
+						_type: "zettel_span",
+						_key: keyFor(undefined, context, currentPath),
 						text: alt,
 						marks: [...inherited],
 					});
 				continue;
 			}
 			result.push({
-				type: "zettel_image",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_image",
+				_key: keyFor(node, context, currentPath),
 				src,
 				alt: attr(node, "alt") ?? "",
 				...(attr(node, "title") !== undefined ? { title: attr(node, "title") } : {}),
@@ -649,12 +649,12 @@ function parseInlineNodes(
 				const existing = usableKey
 					? markDefs.find(
 							(definition) =>
-								definition.zettel_key === supplied &&
+								definition._key === supplied &&
 								definition.href === href &&
 								definition.title === title
 						)
 					: undefined;
-				let linkKey = existing?.zettel_key;
+				let linkKey = existing?._key;
 				if (!linkKey && usableKey && !context.usedKeys.has(supplied)) {
 					linkKey = supplied;
 					context.usedKeys.add(linkKey);
@@ -662,8 +662,8 @@ function parseInlineNodes(
 				if (!linkKey) linkKey = keyFor(undefined, context, currentPath);
 				if (!existing)
 					markDefs.push({
-						type: "zettel_link",
-						zettel_key: linkKey,
+						_type: "zettel_link",
+						_key: linkKey,
 						href,
 						...(attr(node, "title") !== undefined ? { title: attr(node, "title") } : {}),
 					});
@@ -684,14 +684,14 @@ function parseInlineNodes(
 				currentPath
 			);
 			const first = nested[0];
-			if (first && "zettel_key" in first) first.zettel_key = spanKey;
+			if (first && "_key" in first) first._key = spanKey;
 			result.push(...nested);
 			continue;
 		}
 		if (hasClass(node, "zettel_html_inline") || attr(node, "data-zettel-readonly") === "true") {
 			result.push({
-				type: "zettel_html_inline",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_html_inline",
+				_key: keyFor(node, context, currentPath),
 				value: textContent(node),
 				marks: [...inherited],
 			});
@@ -705,8 +705,8 @@ function parseInlineNodes(
 				currentPath
 			);
 			result.push({
-				type: "zettel_html_inline",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_html_inline",
+				_key: keyFor(node, context, currentPath),
 				value: cleanRaw(node),
 				marks: [...inherited],
 			});
@@ -736,8 +736,8 @@ function makeTextBlock(
 ): TextBlock {
 	const markDefs: Link[] = [];
 	return {
-		type: "zettel_text",
-		zettel_key: keyFor(node, context, path),
+		_type: "zettel_block",
+		_key: keyFor(node, context, path),
 		style,
 		children: parseInlineNodes(node.childNodes ?? [], context, markDefs, [], path),
 		markDefs,
@@ -752,8 +752,8 @@ function parseCode(node: HtmlElement, context: ParseContext, path: string): Code
 	const language = attr(node, "data-language") ?? languageClass;
 	const meta = attr(node, "data-meta") ?? (codeNode ? attr(codeNode, "data-meta") : undefined);
 	return {
-		type: "zettel_code",
-		zettel_key: keyFor(node, context, path),
+		_type: "zettel_code",
+		_key: keyFor(node, context, path),
 		code: textContent(codeNode ?? node),
 		...(language ? { language } : {}),
 		...(meta ? { meta } : {}),
@@ -791,15 +791,15 @@ function parseTable(node: HtmlElement, context: ParseContext, path: string): Tab
 					rawAlign === "left" || rawAlign === "right" || rawAlign === "center" ? rawAlign : null
 				);
 			cells.push({
-				type: "zettel_table_cell",
-				zettel_key: keyFor(cell, context, `${path}.row[${rowIndex}].cell[${cellIndex}]`),
+				_type: "zettel_table_cell",
+				_key: keyFor(cell, context, `${path}.row[${rowIndex}].cell[${cellIndex}]`),
 				children: parseInlineNodes(cell.childNodes ?? [], context, markDefs, [], `${path}.cell`),
 				markDefs,
 			});
 		}
 		parsedRows.push({
-			type: "zettel_table_row",
-			zettel_key: keyFor(row, context, `${path}.row[${rowIndex}]`),
+			_type: "zettel_table_row",
+			_key: keyFor(row, context, `${path}.row[${rowIndex}]`),
 			cells,
 		});
 	}
@@ -814,16 +814,16 @@ function parseTable(node: HtmlElement, context: ParseContext, path: string): Tab
 			);
 		while (row.cells.length < width)
 			row.cells.push({
-				type: "zettel_table_cell",
-				zettel_key: keyFor(undefined, context, path),
+				_type: "zettel_table_cell",
+				_key: keyFor(undefined, context, path),
 				children: [],
 				markDefs: [],
 			});
 	}
 	while (align.length < width) align.push(null);
 	return {
-		type: "zettel_table",
-		zettel_key: keyFor(node, context, path),
+		_type: "zettel_table",
+		_key: keyFor(node, context, path),
 		align: align.slice(0, width),
 		rows: parsedRows,
 	};
@@ -840,8 +840,8 @@ function parseListItem(node: HtmlElement, context: ParseContext, path: string): 
 		const children = parseInlineNodes(inline.splice(0), context, markDefs, [], `${path}.inline`);
 		if (children.length)
 			blocks.push({
-				type: "zettel_text",
-				zettel_key: keyFor(undefined, context, path),
+				_type: "zettel_block",
+				_key: keyFor(undefined, context, path),
 				style: "normal",
 				children,
 				markDefs,
@@ -897,8 +897,8 @@ function parseListItem(node: HtmlElement, context: ParseContext, path: string): 
 			!hasAttr(node, "data-tight") &&
 			(node.childNodes ?? []).some((child) => isElement(child) && child.tagName === "p"));
 	return {
-		type: "zettel_list_item",
-		zettel_key: keyFor(node, context, path),
+		_type: "zettel_list_item",
+		_key: keyFor(node, context, path),
 		blocks,
 		spread,
 		...(checked === undefined ? {} : { checked }),
@@ -926,8 +926,8 @@ function parseList(node: HtmlElement, context: ParseContext, path: string): List
 		explicitSpread === "true" ||
 		(explicitSpread === undefined && !hasAttr(node, "data-tight") && inferredSpread);
 	const list: List = {
-		type: "zettel_list",
-		zettel_key: keyFor(node, context, path),
+		_type: "zettel_list",
+		_key: keyFor(node, context, path),
 		kind,
 		...(kind === "number" ? { start } : {}),
 		spread,
@@ -954,8 +954,8 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 		);
 		if (children.length)
 			blocks.push({
-				type: "zettel_text",
-				zettel_key: keyFor(undefined, context, path),
+				_type: "zettel_block",
+				_key: keyFor(undefined, context, path),
 				style: "normal",
 				children,
 				markDefs,
@@ -983,8 +983,8 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 				if (acceptHandlerNode(value, false, context, currentPath)) blocks.push(value as Block);
 				else
 					blocks.push({
-						type: "zettel_html",
-						zettel_key: keyFor(node, context, currentPath),
+						_type: "zettel_html",
+						_key: keyFor(node, context, currentPath),
 						value: cleanRaw(node),
 					});
 				continue;
@@ -993,8 +993,8 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 		if (hasClass(node, "zettel_html")) {
 			flushInline();
 			blocks.push({
-				type: "zettel_html",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_html",
+				_key: keyFor(node, context, currentPath),
 				value: textContent(node),
 			});
 			continue;
@@ -1021,15 +1021,15 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 					"Preserved an empty list as read-only HTML.",
 					currentPath
 				);
-				blocks.push({ type: "zettel_html", zettel_key: list.zettel_key, value: cleanRaw(node) });
+				blocks.push({ _type: "zettel_html", _key: list._key, value: cleanRaw(node) });
 			} else blocks.push(list);
 			continue;
 		}
 		if (node.tagName === "blockquote") {
 			flushInline();
 			blocks.push({
-				type: "zettel_quote",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_quote",
+				_key: keyFor(node, context, currentPath),
 				blocks: parseBlocks(node.childNodes ?? [], context, currentPath),
 			});
 			continue;
@@ -1041,7 +1041,7 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 		}
 		if (node.tagName === "hr") {
 			flushInline();
-			blocks.push({ type: "zettel_rule", zettel_key: keyFor(node, context, currentPath) });
+			blocks.push({ _type: "zettel_rule", _key: keyFor(node, context, currentPath) });
 			continue;
 		}
 		if (node.tagName === "table") {
@@ -1054,7 +1054,7 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 					"Preserved an empty table as read-only HTML.",
 					currentPath
 				);
-				blocks.push({ type: "zettel_html", zettel_key: table.zettel_key, value: cleanRaw(node) });
+				blocks.push({ _type: "zettel_html", _key: table._key, value: cleanRaw(node) });
 			} else blocks.push(table);
 			continue;
 		}
@@ -1077,8 +1077,8 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 				currentPath
 			);
 			blocks.push({
-				type: "zettel_html",
-				zettel_key: keyFor(node, context, currentPath),
+				_type: "zettel_html",
+				_key: keyFor(node, context, currentPath),
 				value: source,
 			});
 		}
@@ -1103,7 +1103,7 @@ export function importHtml(html: string, options: HtmlImportOptions = {}): HtmlI
 		wrapper && isElement(wrapper)
 			? roots.flatMap((node) => (node === wrapper ? (wrapper.childNodes ?? []) : [node]))
 			: roots;
-	const document = { $schema: SCHEMA_URL, blocks: parseBlocks(source, context) } as Document;
+	const document = { _type: "zettel_doc", blocks: parseBlocks(source, context) } as Document;
 	// Importers must never return an invalid Document, even when a handler or
 	// a future parser change violates an invariant not caught locally.
 	assertDocument(document, extensionValidationOptions(options));

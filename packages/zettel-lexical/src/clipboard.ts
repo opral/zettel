@@ -106,7 +106,7 @@ export function pasteClipboardData(editor: LexicalEditor, data: ClipboardPayload
       const first = document.blocks[0] as any;
       const anchor = selection.anchor.getNode();
       const parent = anchor.getParent();
-      if (selection.isCollapsed() && first?.type === "zettel_text" && anchor instanceof ZettelSpanNode && parent instanceof ElementNode && (parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) {
+      if (selection.isCollapsed() && first?._type === "zettel_block" && anchor instanceof ZettelSpanNode && parent instanceof ElementNode && (parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) {
         if (parent instanceof ZettelTextBlockNode && document.blocks.length > 1) {
           pasteTextBlocksAtCaret(parent, anchor, selection.anchor.offset, document.blocks, registry);
         } else {
@@ -123,9 +123,9 @@ export function pasteClipboardData(editor: LexicalEditor, data: ClipboardPayload
   return parsed;
 }
 
-function setInlineLink(node: LexicalNode, markDefs: Array<{ zettel_key: string; href: string }>): void {
+function setInlineLink(node: LexicalNode, markDefs: Array<{ _key: string; href: string }>): void {
   if (!(node instanceof ZettelSpanNode) && !(node instanceof ZettelImageNode)) return;
-  const href = node.toZettel().marks.map((mark) => markDefs.find((definition) => definition.zettel_key === mark)?.href).find(Boolean);
+  const href = node.toZettel().marks.map((mark) => markDefs.find((definition) => definition._key === mark)?.href).find(Boolean);
   node.setLinkHref(href);
 }
 
@@ -138,9 +138,9 @@ function appendMarkDefs(block: ZettelTextBlockNode | ZettelTableCellNode, defini
 function cloneMarkDefs(markDefs: Link[]): { markDefs: Link[]; marks: Map<string, string> } {
   const marks = new Map<string, string>();
   const cloned = markDefs.map((definition) => {
-    const zettel_key = generateKey();
-    marks.set(definition.zettel_key, zettel_key);
-    return { ...definition, zettel_key };
+    const _key = generateKey();
+    marks.set(definition._key, _key);
+    return { ...definition, _key };
   });
   return { markDefs: cloned, marks };
 }
@@ -184,7 +184,7 @@ function pasteInlineAtCaret(parent: ZettelTextBlockNode | ZettelTableCellNode, a
     cursor = node;
   }
   if (right) {
-    const rightNode = new ZettelSpanNode({ type: "zettel_span", zettel_key: generateKey(), text: right, marks: anchorMarks });
+    const rightNode = new ZettelSpanNode({ _type: "zettel_span", _key: generateKey(), text: right, marks: anchorMarks });
     setInlineLink(rightNode, parent.markDefs);
     if (cursor) cursor.insertAfter(rightNode);
     else if (firstExisting) firstExisting.insertBefore(rightNode);
@@ -200,7 +200,7 @@ function pasteInlineAtCaret(parent: ZettelTextBlockNode | ZettelTableCellNode, a
  */
 function pasteTextBlocksAtCaret(parent: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number, blocks: Block[], registry: ZettelNodeRegistry): void {
   const first = blocks[0];
-  if (!first || first.type !== "zettel_text") return;
+  if (!first || first._type !== "zettel_block") return;
   const firstText = first as TextBlock;
   const source = anchor.getTextContent();
   const anchorMarks = anchor.toZettel().marks;
@@ -223,7 +223,7 @@ function pasteTextBlocksAtCaret(parent: ZettelTextBlockNode, anchor: ZettelSpanN
   const cloned = cloneMarkDefs(parent.markDefs);
   const trailing = $createTextBlockLike(parent, cloned.markDefs);
   if (right) {
-    const rightNode = new ZettelSpanNode({ type: "zettel_span", zettel_key: generateKey(), text: right, marks: anchorMarks.map((mark) => cloned.marks.get(mark) ?? mark) });
+    const rightNode = new ZettelSpanNode({ _type: "zettel_span", _key: generateKey(), text: right, marks: anchorMarks.map((mark) => cloned.marks.get(mark) ?? mark) });
     setInlineLink(rightNode, trailing.markDefs);
     trailing.append(rightNode);
   }
@@ -248,7 +248,7 @@ function pasteTextBlocksAtCaret(parent: ZettelTextBlockNode, anchor: ZettelSpanN
 }
 
 function $createTextBlockLike(source: ZettelTextBlockNode, markDefs = source.markDefs): ZettelTextBlockNode {
-  return new ZettelTextBlockNode({ type: "zettel_text", style: source.style, markDefs });
+  return new ZettelTextBlockNode({ _type: "zettel_block", style: source.style, markDefs });
 }
 
 function toPlainText(document: Document): string {
@@ -256,8 +256,8 @@ function toPlainText(document: Document): string {
 }
 
 function blockPlainText(block: Block): string {
-  switch (block.type) {
-    case "zettel_text": return (block as TextBlock).children.map(inlinePlainText).join("");
+  switch (block._type) {
+    case "zettel_block": return (block as TextBlock).children.map(inlinePlainText).join("");
     case "zettel_list": return (block as List).items.map((item) => item.blocks.map(blockPlainText).join("\n")).join("\n");
     case "zettel_quote": return (block as Quote).blocks.map(blockPlainText).join("\n");
     case "zettel_code": return (block as Code).code;
@@ -268,10 +268,10 @@ function blockPlainText(block: Block): string {
 }
 
 function inlinePlainText(inline: Inline): string {
-  if (inline.type === "zettel_span") return (inline as Span).text;
-  if (inline.type === "zettel_break") return "\n";
-  if (inline.type === "zettel_image") return (inline as Image).alt;
-  if (inline.type === "zettel_html_inline") return (inline as InlineHtml).value;
+  if (inline._type === "zettel_span") return (inline as Span).text;
+  if (inline._type === "zettel_break") return "\n";
+  if (inline._type === "zettel_image") return (inline as Image).alt;
+  if (inline._type === "zettel_html_inline") return (inline as InlineHtml).value;
   return JSON.stringify(inline);
 }
 
@@ -281,11 +281,11 @@ function escapeHtml(value: string): string {
 
 function fromPlainText(text: string): Document {
   return createDocument(text ? text.split(/\r?\n/).map((line): TextBlock => ({
-    type: "zettel_text",
-    zettel_key: generateKey(),
+    _type: "zettel_block",
+    _key: generateKey(),
     style: "normal",
     markDefs: [],
-    children: line ? [{ type: "zettel_span", zettel_key: generateKey(), text: line, marks: [] }] : [],
+    children: line ? [{ _type: "zettel_span", _key: generateKey(), text: line, marks: [] }] : [],
   })) : []);
 }
 
@@ -350,15 +350,15 @@ function selectedTable(table: ZettelTableNode, selectedCells: ZettelTableCellNod
     const cells = rowNode.getChildren().filter((node): node is ZettelTableCellNode => node instanceof ZettelTableCellNode && selected.has(node));
     if (!cells.length) continue;
     widths.push(cells.length);
-    rows.push({ type: "zettel_table_row", zettel_key: generateKey(), cells: cells.map((cell) => selectedTableCell(cell, nodes, selection)) });
+    rows.push({ _type: "zettel_table_row", _key: generateKey(), cells: cells.map((cell) => selectedTableCell(cell, nodes, selection)) });
   }
   const width = Math.max(1, ...widths);
-  for (const row of rows) while (row.cells.length < width) row.cells.push({ type: "zettel_table_cell", zettel_key: generateKey(), children: [], markDefs: [] });
+  for (const row of rows) while (row.cells.length < width) row.cells.push({ _type: "zettel_table_cell", _key: generateKey(), children: [], markDefs: [] });
   const columns = selectedCells.map((cell) => {
     const row = cell.getParent<ZettelTableRowNode>();
     return row ? row.getChildren().indexOf(cell) : -1;
   }).filter((column) => column >= 0);
-  return { type: "zettel_table", zettel_key: generateKey(), align: columns.slice(0, width).map((column) => source.align[column] ?? null), rows };
+  return { _type: "zettel_table", _key: generateKey(), align: columns.slice(0, width).map((column) => source.align[column] ?? null), rows };
 }
 
 function selectedTableCell(cell: ZettelTableCellNode, nodes: LexicalNode[], selection: RangeSelection): TableCell {
@@ -375,13 +375,13 @@ function selectedTableCell(cell: ZettelTableCellNode, nodes: LexicalNode[], sele
       const source = child.toZettel();
       const start = child.getKey() === startKey ? startOffset : 0;
       const end = child.getKey() === endKey ? endOffset : source.text.length;
-      if (end > start) children.push({ ...source, zettel_key: generateKey(), text: source.text.slice(start, end), marks: [...source.marks] });
+      if (end > start) children.push({ ...source, _key: generateKey(), text: source.text.slice(start, end), marks: [...source.marks] });
     } else {
       const source = exportInlineNode(child)[0];
-      if (source) children.push({ ...source, zettel_key: generateKey() } as Inline);
+      if (source) children.push({ ...source, _key: generateKey() } as Inline);
     }
   }
-  return { type: "zettel_table_cell", zettel_key: generateKey(), children, markDefs: cell.markDefs };
+  return { _type: "zettel_table_cell", _key: generateKey(), children, markDefs: cell.markDefs };
 }
 
 function selectedTextBlock(block: ZettelTextBlockNode, nodes: LexicalNode[], selection: RangeSelection): TextBlock {
@@ -398,13 +398,13 @@ function selectedTextBlock(block: ZettelTextBlockNode, nodes: LexicalNode[], sel
       const source = child.toZettel();
       const start = child.getKey() === startKey ? startOffset : 0;
       const end = child.getKey() === endKey ? endOffset : source.text.length;
-      if (end > start) children.push({ ...source, zettel_key: generateKey(), text: source.text.slice(start, end), marks: [...source.marks] });
+      if (end > start) children.push({ ...source, _key: generateKey(), text: source.text.slice(start, end), marks: [...source.marks] });
     } else {
       const source = exportInlineNode(child)[0];
-      if (source) children.push({ ...source, zettel_key: generateKey() } as Inline);
+      if (source) children.push({ ...source, _key: generateKey() } as Inline);
     }
   }
-  return { type: "zettel_text", zettel_key: generateKey(), style: block.style, children, markDefs: block.markDefs };
+  return { _type: "zettel_block", _key: generateKey(), style: block.style, children, markDefs: block.markDefs };
 }
 
 /** Give pasted nodes fresh document keys and rewrite local mark references. */
@@ -413,23 +413,23 @@ function remapDocument(document: Document): Document {
   const key = (old: string): string => { const next = generateKey(); keyMap.set(old, next); return next; };
   const remapInline = (inline: Inline, marks: Map<string, string>): Inline => {
     const value = inline as Record<string, unknown>;
-    const remapped: Record<string, unknown> = { ...value, zettel_key: key(String(value.zettel_key)) };
-    if (["zettel_span", "zettel_break", "zettel_image", "zettel_html_inline"].includes(String(value.type)) && Array.isArray(value.marks)) {
+    const remapped: Record<string, unknown> = { ...value, _key: key(String(value._key)) };
+    if (["zettel_span", "zettel_break", "zettel_image", "zettel_html_inline"].includes(String(value._type)) && Array.isArray(value.marks)) {
       remapped.marks = value.marks.map((mark) => typeof mark === "string" ? marks.get(mark) ?? mark : mark);
     }
     return remapped as Inline;
   };
   const remapBlock = (block: Block): Block => {
     const value = block as any;
-    switch (value.type) {
-      case "zettel_text": {
-        const marks = new Map<string, string>((value.markDefs ?? []).map((definition: any) => [definition.zettel_key, key(definition.zettel_key)]));
-        return { ...value, zettel_key: key(value.zettel_key), markDefs: (value.markDefs ?? []).map((definition: any) => ({ ...definition, zettel_key: marks.get(definition.zettel_key)! })), children: (value.children ?? []).map((child: Inline) => remapInline(child, marks)) } as Block;
+    switch (value._type) {
+      case "zettel_block": {
+        const marks = new Map<string, string>((value.markDefs ?? []).map((definition: any) => [definition._key, key(definition._key)]));
+        return { ...value, _key: key(value._key), markDefs: (value.markDefs ?? []).map((definition: any) => ({ ...definition, _key: marks.get(definition._key)! })), children: (value.children ?? []).map((child: Inline) => remapInline(child, marks)) } as Block;
       }
-      case "zettel_table": return { ...value, zettel_key: key(value.zettel_key), rows: (value.rows ?? []).map((row: any) => ({ ...row, zettel_key: key(row.zettel_key), cells: (row.cells ?? []).map((cell: any) => { const marks = new Map<string, string>((cell.markDefs ?? []).map((definition: any) => [definition.zettel_key, key(definition.zettel_key)])); return { ...cell, zettel_key: key(cell.zettel_key), markDefs: (cell.markDefs ?? []).map((definition: any) => ({ ...definition, zettel_key: marks.get(definition.zettel_key)! })), children: (cell.children ?? []).map((child: Inline) => remapInline(child, marks)) }; }) })) } as Block;
-      case "zettel_list": return { ...value, zettel_key: key(value.zettel_key), items: (value.items ?? []).map((item: any) => ({ ...item, zettel_key: key(item.zettel_key), blocks: (item.blocks ?? []).map(remapBlock) })) } as Block;
-      case "zettel_quote": return { ...value, zettel_key: key(value.zettel_key), blocks: (value.blocks ?? []).map(remapBlock) } as Block;
-      default: return { ...value, zettel_key: key(value.zettel_key) } as Block;
+      case "zettel_table": return { ...value, _key: key(value._key), rows: (value.rows ?? []).map((row: any) => ({ ...row, _key: key(row._key), cells: (row.cells ?? []).map((cell: any) => { const marks = new Map<string, string>((cell.markDefs ?? []).map((definition: any) => [definition._key, key(definition._key)])); return { ...cell, _key: key(cell._key), markDefs: (cell.markDefs ?? []).map((definition: any) => ({ ...definition, _key: marks.get(definition._key)! })), children: (cell.children ?? []).map((child: Inline) => remapInline(child, marks)) }; }) })) } as Block;
+      case "zettel_list": return { ...value, _key: key(value._key), items: (value.items ?? []).map((item: any) => ({ ...item, _key: key(item._key), blocks: (item.blocks ?? []).map(remapBlock) })) } as Block;
+      case "zettel_quote": return { ...value, _key: key(value._key), blocks: (value.blocks ?? []).map(remapBlock) } as Block;
+      default: return { ...value, _key: key(value._key) } as Block;
     }
   };
   return { ...document, blocks: document.blocks.map(remapBlock) };
