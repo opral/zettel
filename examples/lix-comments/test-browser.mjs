@@ -17,6 +17,23 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.goto(app.url);
   await page.locator('[data-target="checkpoint"]').waitFor();
+  // Regression: type directly into the untouched composer, without importing content.
+  await page.locator('#editor').click();
+  await page.keyboard.type('Fresh comment');
+  await page.waitForFunction(() => document.querySelector('#json').value.includes('Fresh comment'), null, { timeout: 3000 });
+  await page.locator('#save').click();
+  await page.waitForFunction(() => document.querySelector('#comments').textContent.includes('Fresh comment'));
+  await page.locator('#editor').click();
+  await page.keyboard.type('Second draft');
+  await page.waitForFunction(() => document.querySelector('#json').value.includes('Second draft'));
+  checks.push('Fresh empty composer and post-save reset both accept direct keyboard typing');
+  // Remove only the regression fixture in this disposable test database.
+  await app.model.serial(async () => {
+    await app.model.lix.execute('DELETE FROM demo_comment');
+    await app.model.save();
+  });
+  await page.reload();
+  await page.locator('[data-target="checkpoint"]').waitFor();
   const targets = (await (await page.request.get(`${app.url}/api/state`)).json()).conversations;
   const savedIds = [];
   for (const target of ['checkpoint', 'paragraph', 'csv']) {

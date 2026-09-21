@@ -3,6 +3,7 @@ import {
   $isRangeSelection,
   COMMAND_PRIORITY_EDITOR,
   COPY_COMMAND,
+  CONTROLLED_TEXT_INSERTION_COMMAND,
   CUT_COMMAND,
   DELETE_CHARACTER_COMMAND,
   DELETE_WORD_COMMAND,
@@ -54,6 +55,16 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
   });
   return mergeRegister(
     unregisterRoot,
+    // Lexical routes typing in empty blocks (and other controlled insertion
+    // cases) through this command rather than a native text-node mutation.
+    editor.registerCommand(CONTROLLED_TEXT_INSERTION_COMMAND, (eventOrText) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      const text = typeof eventOrText === "string" ? eventOrText : eventOrText.data;
+      if (text === null) return false;
+      selection.insertText(text);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<TextFormatType>(FORMAT_TEXT_COMMAND, (format) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;

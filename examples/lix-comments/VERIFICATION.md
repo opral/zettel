@@ -32,3 +32,9 @@ The unit is the JSONB **column**. Different paragraphs inside the same body do n
 ## Boundaries
 
 The account, Markdown paragraph, and CSV row tables are registered prototype schemas. This does not verify production account integration, file-plugin import/export, automatic paragraph identity across external file rewrites, deletion policy, authentication, or multi-replica network synchronization. The branch tests use the real engine locally. No new rich-text nodes were needed to complete these flows.
+
+## Empty-composer regression
+
+A user reported that direct typing into the untouched composer did nothing. The earlier browser checks all imported Markdown first and missed this path. A new browser test reproduced a timeout before the fix. The composer now initializes an empty paragraph, and the Lexical plugin handles `CONTROLLED_TEXT_INSERTION_COMMAND`, which is required when there is no existing text node to mutate. Empty Markdown imports also produce an editable paragraph; blank drafts are rejected on save.
+
+After the fix, all 6 model groups and 6 browser groups pass, including fresh typing and typing after save/reset. All 22 Lexical tests pass, including a controlled-insertion regression with Unicode text. Stored empty-document semantics remain unchanged.

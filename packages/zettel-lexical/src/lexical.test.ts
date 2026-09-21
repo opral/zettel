@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEditor } from "lexical";
+import { createEditor, $getRoot, CONTROLLED_TEXT_INSERTION_COMMAND } from "lexical";
 import {
   ZettelNodes,
   createZettelEditor,
@@ -64,6 +64,19 @@ function fixture(): Document {
 }
 
 describe("Zettel Lexical state", () => {
+  it("handles controlled insertion into an empty paragraph", () => {
+    const editor = createZettelEditor();
+    registerZettelLexicalPlugin(editor);
+    loadDocument(editor, { _type: "zettel_doc", blocks: [{ _type: "zettel_block", _key: "empty", style: "normal", markDefs: [], children: [] }] });
+    editor.update(() => {
+      $getRoot().getFirstChildOrThrow().selectStart();
+      expect(editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, "Hello 👋")).toBe(true);
+    }, { discrete: true });
+    const block = exportDocument(editor).blocks[0] as any;
+    expect(block._key).toBe("empty");
+    expect(block.children[0].text).toBe("Hello 👋");
+  });
+
   it("round trips every core node while retaining keys and shared mark definitions", () => {
     const document = fixture();
     const editor = createZettelEditor();

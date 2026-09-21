@@ -1,5 +1,5 @@
 import './style.css';
-import { createDocument } from '@opral/zettel-ast';
+import { createDocument, generateKey } from '@opral/zettel-ast';
 import { fromMarkdown, toMarkdown } from '@opral/zettel-markdown';
 import { toHtml } from '@opral/zettel-html';
 import { createZettelEditor, loadDocument, exportDocument, registerZettelLexicalPlugin } from '@opral/zettel-lexical';
@@ -11,7 +11,7 @@ editor.setRootElement($('editor'));
 registerZettelLexicalPlugin(editor);
 function showError(e) { $('error').textContent = e.message ?? String(e); }
 function syncJson() { $('json').value = JSON.stringify(exportDocument(editor), null, 2); }
-function apply(body) { loadDocument(editor, body); syncJson(); }
+function apply(body) { loadDocument(editor, body.blocks.length ? body : emptyDraft()); syncJson(); }
 editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
   if (!dirtyElements.size && !dirtyLeaves.size) return;
   dirty = true; syncJson();
@@ -22,7 +22,12 @@ async function api(path, payload) {
   if (!response.ok) throw new Error(result.error);
   return result;
 }
-function reset() { editing = null; $('compose-title').textContent = 'Add a comment'; $('cancel').hidden = true; $('author').disabled = false; apply(createDocument()); $('markdown').value = ''; dirty = false; }
+// An empty stored document is valid, but the editable composer needs a block
+// that can hold a caret. Do not change the format's empty-document semantics.
+function emptyDraft() {
+  return createDocument([{ _type: 'zettel_block', _key: generateKey(), style: 'normal', markDefs: [], children: [] }]);
+}
+function reset() { editing = null; $('compose-title').textContent = 'Add a comment'; $('cancel').hidden = true; $('author').disabled = false; apply(emptyDraft()); $('markdown').value = ''; dirty = false; }
 function render() {
   $('targets').replaceChildren();
   for (const conversation of state.conversations) {
@@ -52,7 +57,7 @@ $('save').onclick = async () => {
   if (busy) return; busy = true; $('save').disabled = true; editor.setEditable(false); $('error').textContent = '';
   try {
     const body = exportDocument(editor);
-    if (!body.blocks.length) throw new Error('Write a comment first.');
+    if (!toMarkdown(body).trim()) throw new Error('Write a comment first.');
     await api(editing ? `/comments/${encodeURIComponent(editing)}` : '/comments', { body, conversationId: selected, authorId: $('author').value });
     state = await api('/state'); reset(); render(); $('status').textContent = 'Saved to Lix';
   } catch (e) { showError(e); } finally { busy = false; $('save').disabled = false; editor.setEditable(true); }
