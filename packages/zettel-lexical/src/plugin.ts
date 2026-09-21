@@ -1,5 +1,6 @@
 import {
   $getSelection,
+  createCommand,
   $isRangeSelection,
   COMMAND_PRIORITY_EDITOR,
   COPY_COMMAND,
@@ -38,6 +39,49 @@ import {
 } from "./nodes/index.js";
 import { generateKey, type Link } from "./types.js";
 
+/** Apply, edit, or remove a link on selected prose text. */
+export const SET_ZETTEL_LINK_COMMAND = createCommand<string | null>("SET_ZETTEL_LINK_COMMAND");
+
+export function $setZettelLink(href: string | null): boolean {
+  if (href !== null && !/^(https?:\/\/|mailto:)/i.test(href.trim())) {
+    throw new Error("Use an https://, http://, or mailto: URL.");
+  }
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection)) return false;
+  if (selection.isCollapsed()) {
+    const anchor = selection.anchor.getNode();
+    const parent = anchor.getParent();
+    if (!(anchor instanceof ZettelSpanNode) || !(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) return false;
+    const link = parent.markDefs.find(def => anchor.toZettel().marks.includes(def._key));
+    if (!link) return false;
+    // A formatted link may comprise several adjacent spans.
+    let first = anchor, last = anchor;
+    while (first.getPreviousSibling() instanceof ZettelSpanNode && (first.getPreviousSibling() as ZettelSpanNode).toZettel().marks.includes(link._key)) first = first.getPreviousSibling() as ZettelSpanNode;
+    while (last.getNextSibling() instanceof ZettelSpanNode && (last.getNextSibling() as ZettelSpanNode).toZettel().marks.includes(link._key)) last = last.getNextSibling() as ZettelSpanNode;
+    selection.setTextNodeRange(first, 0, last, last.getTextContentSize());
+  }
+  let changed = false;
+  for (const node of selection.extract()) {
+    if (!(node instanceof ZettelSpanNode)) continue;
+    const parent = node.getParent();
+    if (!(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) continue;
+    const marks = node.toZettel().marks.filter(mark => !parent.markDefs.some(def => def._key === mark));
+    if (href !== null) {
+      const url = href.trim();
+      let definition = parent.markDefs.find(def => def.href === url);
+      if (!definition) {
+        definition = { _type: "zettel_link", _key: generateKey(), href: url };
+        parent.getWritable().markDefs = [...parent.markDefs, definition];
+      }
+      marks.push(definition._key);
+    }
+    node.setMarks(marks);
+    node.setLinkHref(href?.trim());
+    changed = true;
+  }
+  return changed;
+}
+
 export interface ZettelLexicalPluginOptions {
   onPasteDiagnostics?: (diagnostics: unknown[]) => void;
 }
@@ -58,6 +102,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
   });
   return mergeRegister(
     unregisterRoot,
+    editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
     registerHistory(editor, createEmptyHistoryState(), 300),
     // Lexical routes typing in empty blocks (and other controlled insertion
     // cases) through this command rather than a native text-node mutation.

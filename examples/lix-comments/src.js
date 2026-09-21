@@ -2,8 +2,8 @@ import './style.css';
 import { createDocument, generateKey } from '@opral/zettel-ast';
 import { fromMarkdown, toMarkdown } from '@opral/zettel-markdown';
 import { toHtml } from '@opral/zettel-html';
-import { createZettelEditor, loadDocument, exportDocument, registerZettelLexicalPlugin } from '@opral/zettel-lexical';
-import { FORMAT_TEXT_COMMAND } from 'lexical';
+import { createZettelEditor, loadDocument, exportDocument, registerZettelLexicalPlugin, SET_ZETTEL_LINK_COMMAND, ZettelSpanNode } from '@opral/zettel-lexical';
+import { FORMAT_TEXT_COMMAND, $getSelection, $isRangeSelection, $setSelection } from 'lexical';
 const $ = id => document.getElementById(id);
 let state, selected = 'checkpoint', editing = null, busy = false, dirty = false, markdownDirty = false;
 const editor = createZettelEditor({ namespace: 'lix-comments', onError: showError });
@@ -89,3 +89,37 @@ for (const button of document.querySelectorAll('[data-format]')) {
 }
 window.commentDemo = { editor, getDocument: () => exportDocument(editor) };
 try { state = await api('/state'); reset(); render(); } catch (e) { showError(e); }
+
+let linkSelection;
+function openLink() {
+  if (busy) return;
+  let href = '', eligible = false;
+  editor.getEditorState().read(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection)) return;
+    const node = selection.anchor.getNode();
+    const defs = node.getParent()?.markDefs ?? [];
+    const marks = node instanceof ZettelSpanNode ? node.toZettel().marks : [];
+    href = defs.find(def => marks.includes(def._key))?.href ?? '';
+    eligible = Boolean(href) || !selection.isCollapsed();
+    linkSelection = selection.clone();
+  });
+  if (!eligible) { showError('Select text to add a link, or place the cursor inside an existing link.'); return; }
+  $('error').textContent = ''; $('link-error').textContent = '';
+  $('link-url').value = href; $('unlink').hidden = !href;
+  $('link-dialog').showModal(); $('link-url').focus();
+}
+$('link').onmousedown = event => event.preventDefault();
+$('link').onclick = openLink;
+$('editor').addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openLink(); }
+});
+function applyLink(href) {
+  if (href !== null && !/^(https?:\/\/|mailto:)/i.test(href.trim())) { $('link-error').textContent = 'Use an https://, http://, or mailto: URL.'; return; }
+  $('link-dialog').close();
+  editor.update(() => { $setSelection(linkSelection.clone()); if (!editor.dispatchCommand(SET_ZETTEL_LINK_COMMAND, href)) showError('Links are supported on prose text, including table cells.'); }, { discrete: true });
+  editor.focus();
+}
+$('link-form').onsubmit = event => { event.preventDefault(); applyLink($('link-url').value); };
+$('unlink').onclick = () => applyLink(null);
+$('link-cancel').onclick = () => $('link-dialog').close();

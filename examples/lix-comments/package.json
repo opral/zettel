@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
-    "test": "node test-model.mjs && node test-browser.mjs && pnpm run test:qa",
+    "test": "node test-model.mjs && node test-browser.mjs && pnpm run test:qa && node test-links.mjs",
     "test:qa": "node test-qa-editing.mjs && node test-qa-clipboard.mjs && node test-qa-navigation.mjs && node test-qa-code-enter.mjs"
   },
   "dependencies": {

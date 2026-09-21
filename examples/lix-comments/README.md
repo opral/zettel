@@ -40,3 +40,5 @@ The tests use disposable databases, never the interactive demo's snapshot. The m
 Results and screenshots are written to ignored `artifacts/`. See [VERIFICATION.md](VERIFICATION.md) for this run's observations.
 
 The extended user-flow suites also exercise formatting, selection replacement, clipboard, undo/redo, code-block carets, unsaved drafts, and failed-save recovery. See [QA.md](./QA.md) for findings and scope. Run only those suites with `pnpm --filter zettel-lix-comments test:qa`.
+
+Select prose text and choose **Link** (or Ctrl/⌘ K) to add a URL. Place the caret in an existing link to edit or remove it. Supports HTTP(S) and mailto links; formatting, Markdown export, and saved JSON retain link annotations.
