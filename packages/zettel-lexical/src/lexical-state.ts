@@ -1,5 +1,6 @@
 import {
   $getRoot,
+  CLEAR_HISTORY_COMMAND,
   createEditor,
   type LexicalEditor,
   type SerializedEditorState,
@@ -123,6 +124,10 @@ export function loadDocument(
   const nodeRegistry = isRegistry(registry)
     ? registry
     : createNodeRegistry(registry);
+  // A loaded document starts a new editing session. Do not allow undo to
+  // restore content from a different comment or from before an import.
+  // Clear first so the load itself becomes the fresh undo baseline.
+  editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
   editor.update(
     () => {
       const nodes = document.blocks.map((block) =>

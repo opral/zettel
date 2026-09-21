@@ -2,7 +2,11 @@
   "name": "zettel-lix-comments",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "node server.mjs", "test": "node test-model.mjs && node test-browser.mjs" },
+  "scripts": {
+    "dev": "node server.mjs",
+    "test": "node test-model.mjs && node test-browser.mjs && pnpm run test:qa",
+    "test:qa": "node test-qa-editing.mjs && node test-qa-clipboard.mjs && node test-qa-navigation.mjs && node test-qa-code-enter.mjs"
+  },
   "dependencies": {
     "@opral/zettel-ast": "workspace:*",
     "@opral/zettel-markdown": "workspace:*",
@@ -10,5 +14,8 @@
     "@opral/zettel-lexical": "workspace:*",
     "lexical": "^0.30.0"
   },
-  "devDependencies": { "vite": "^6.3.0", "@playwright/test": "1.55.1" }
+  "devDependencies": {
+    "vite": "^6.3.0",
+    "@playwright/test": "1.55.1"
+  }
 }

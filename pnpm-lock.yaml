@@ -111,6 +111,9 @@ importers:
 
   packages/zettel-lexical:
     dependencies:
+      '@lexical/history':
+        specifier: ^0.30.0
+        version: 0.30.0
       '@lexical/utils':
         specifier: ^0.30.0
         version: 0.30.0
@@ -485,6 +488,9 @@ packages:
 
   '@lexical/clipboard@0.30.0':
     resolution: {integrity: sha512-taWQURtE6xF4Jy4I8teQw3+nVBVNO1r+9N9voXeivgwxSrAM40rjqQ/aZEKxWbwZtfkABDkCEArbVrqP0SkWcQ==}
+
+  '@lexical/history@0.30.0':
+    resolution: {integrity: sha512-dxudthi94vSLQKXVq3LSwcOVkOmb2lvxoy7sCma513yJbrsn3fPLppR2Ynhl6aB9oPw675wSDrfsE6BG3U3+CA==}
 
   '@lexical/html@0.30.0':
     resolution: {integrity: sha512-GdegWO6RjJ7eE+yD3Z0X/OpT88SZjOs3DyQ0rgrZy3z7RPaFCbEEcq0M/NssJbKAB1XOFUsUFrnS7kZs1vJzGg==}
@@ -1992,6 +1998,11 @@ snapshots:
       '@lexical/html': 0.30.0
       '@lexical/list': 0.30.0
       '@lexical/selection': 0.30.0
+      '@lexical/utils': 0.30.0
+      lexical: 0.30.0
+
+  '@lexical/history@0.30.0':
+    dependencies:
       '@lexical/utils': 0.30.0
       lexical: 0.30.0
 

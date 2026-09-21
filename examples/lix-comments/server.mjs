@@ -30,7 +30,16 @@ export async function startServer({ port = 49705, path, persist = true } = {}) {
       });
     } }],
   });
-  try { await server.listen(); } catch (e) { await model.close(); throw e; }
+  try {
+    if (port === 0) {
+      // Vite treats zero as its default port; use the underlying server so
+      // independent QA sessions actually receive distinct ephemeral ports.
+      await new Promise((resolve, reject) => {
+        server.httpServer.once('error', reject);
+        server.httpServer.listen(0, '127.0.0.1', () => { server.httpServer.off('error', reject); resolve(); });
+      });
+    } else await server.listen();
+  } catch (e) { await server.close(); await model.close(); throw e; }
   return { model, server, url: `http://localhost:${server.httpServer.address().port}`, async close() { await server.close(); await model.close(); } };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

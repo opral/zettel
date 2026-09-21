@@ -8,6 +8,8 @@ import {
   DELETE_CHARACTER_COMMAND,
   DELETE_WORD_COMMAND,
   FORMAT_TEXT_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_ENTER_COMMAND,
   LexicalEditor,
   PASTE_COMMAND,
@@ -18,6 +20,7 @@ import {
   type RangeSelection,
   type TextFormatType,
 } from "lexical";
+import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { mergeRegister } from "@lexical/utils";
 import { copyDocumentToClipboard, pasteClipboardData } from "./clipboard.js";
 import { exportDocument } from "./lexical-state.js";
@@ -55,6 +58,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
   });
   return mergeRegister(
     unregisterRoot,
+    registerHistory(editor, createEmptyHistoryState(), 300),
     // Lexical routes typing in empty blocks (and other controlled insertion
     // cases) through this command rather than a native text-node mutation.
     editor.registerCommand(CONTROLLED_TEXT_INSERTION_COMMAND, (eventOrText) => {
@@ -84,7 +88,21 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       const copied = copyDocumentToClipboard(editor, "clipboardData" in event ? event as ClipboardEvent : null);
       if (!copied) return false;
       const selection = $getSelection();
-      if ($isRangeSelection(selection)) selection.deleteCharacter(true);
+      if ($isRangeSelection(selection)) selection.removeText();
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<KeyboardEvent>(KEY_BACKSPACE_COMMAND, (event) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      event?.preventDefault();
+      selection.deleteCharacter(true);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<KeyboardEvent>(KEY_DELETE_COMMAND, (event) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      event?.preventDefault();
+      selection.deleteCharacter(false);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(DELETE_CHARACTER_COMMAND, (isBackward) => {
@@ -106,7 +124,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       // Return replaces a selected range before it creates a block or a hard
       // break. Otherwise selected text could survive a structural edit.
       if (!selection.isCollapsed()) {
-        selection.deleteCharacter(true);
+        selection.removeText();
         const next = $getSelection();
         if (!$isRangeSelection(next)) return false;
         selection = next;
@@ -114,8 +132,11 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
 
       const anchor = selection.anchor.getNode();
       const code = nearestAncestor(anchor, ZettelCodeNode);
-      if (code && anchor instanceof ZettelSpanNode) {
-        selection.insertText("\n");
+      if (code) {
+        // Keep code line breaks as Lexical LineBreakNodes. Chromium treats a
+        // terminal literal newline in a contenteditable text node as a visual
+        // line ending and inserts the next native character before it.
+        selection.insertLineBreak();
         event?.preventDefault();
         return true;
       }

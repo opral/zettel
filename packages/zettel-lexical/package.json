@@ -28,6 +28,7 @@
     "format": "prettier ./src --write"
   },
   "dependencies": {
+    "@lexical/history": "^0.30.0",
     "@lexical/utils": "^0.30.0",
     "@opral/zettel-ast": "workspace:*",
     "@opral/zettel-html": "workspace:*"

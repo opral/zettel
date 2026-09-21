@@ -38,3 +38,5 @@ BROWSER_BIN=/path/to/chromium pnpm --filter zettel-lix-comments test
 The tests use disposable databases, never the interactive demo's snapshot. The model test checks real FKs, body validation, target identity after edits/reordering, persistence across close/reopen, divergent branch merges, and merged-state persistence. The browser test imports GFM, types in Lexical, saves and reloads, edits each comment, exports Markdown, restarts the full server, and checks mobile overflow and console errors.
 
 Results and screenshots are written to ignored `artifacts/`. See [VERIFICATION.md](VERIFICATION.md) for this run's observations.
+
+The extended user-flow suites also exercise formatting, selection replacement, clipboard, undo/redo, code-block carets, unsaved drafts, and failed-save recovery. See [QA.md](./QA.md) for findings and scope. Run only those suites with `pnpm --filter zettel-lix-comments test:qa`.
