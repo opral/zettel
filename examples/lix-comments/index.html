@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Zettel · Lix conversations</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Zettel home"
+        ><span class="brand-mark">Z</span> zettel
+        <span class="lab">LAB</span></a
+      >
+      <p class="eyebrow">A document, wherever it goes.</p>
+      <div class="section-label">CONVERSATIONS</div>
+      <nav id="conversations" aria-label="Conversations"></nav>
+      <div class="sidebar-note">
+        <span class="live-dot"></span> Real Lix database
+        <p>Comments in JSONB.<br />Files stored separately.</p>
+        <a href="/api/snapshot" download="zettel-demo.lix"
+          >Download database ↗</a
+        >
+      </div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <div class="breadcrumb">
+            Lix workspace <span>/</span> Conversations
+          </div>
+          <h1 id="title">Loading conversations…</h1>
+          <div id="subject" class="subject"></div>
+        </div>
+        <span class="badge">Zettel v1 · preview</span>
+      </header>
+      <div class="workspace">
+        <section class="discussion" aria-label="Discussion">
+          <div id="comments" aria-live="polite"></div>
+          <form id="composer" class="composer">
+            <div class="composer-heading">
+              <strong id="composer-title">Add a comment</strong>
+              <div class="tabs" role="group" aria-label="Authoring format">
+                <button
+                  type="button"
+                  id="markdown-tab"
+                  class="active"
+                  aria-pressed="true"
+                >
+                  Markdown</button
+                ><button type="button" id="json-tab" aria-pressed="false">
+                  JSON
+                </button>
+              </div>
+            </div>
+            <label class="sr-only" for="draft">Comment body</label
+            ><textarea
+              id="draft"
+              rows="6"
+              placeholder="Write a comment. Try a list, quote, or shared link…"
+              spellcheck="true"
+            ></textarea>
+            <div class="composer-tools">
+              <label
+                ><span class="sr-only">Insert a mention</span
+                ><select id="mention">
+                  <option value="">@ Mention</option>
+                </select></label
+              ><label class="file-button"
+                >＋ Attach a file<input type="file" id="upload" /></label
+              ><button type="button" id="example">Try nested content</button>
+            </div>
+            <div id="error" class="error" role="alert" hidden></div>
+            <footer>
+              <span id="save-status"
+                >Markdown imports into structured JSON.</span
+              >
+              <div>
+                <button type="button" id="cancel" hidden>Cancel edit</button
+                ><button type="submit" id="submit" class="primary">
+                  Post comment
+                </button>
+              </div>
+            </footer>
+          </form>
+        </section>
+        <aside class="inspector" aria-label="Document inspector">
+          <div class="inspector-heading">
+            <span class="section-label">DOCUMENT INSPECTOR</span
+            ><span class="tiny-badge">JSONB</span>
+          </div>
+          <h2 id="inspector-title">Stored comment body</h2>
+          <p class="muted">Select a comment to see the document behind it.</p>
+          <div class="inspector-actions">
+            <button id="copy-json" type="button">Copy JSON</button
+            ><button id="export-md" type="button">Export Markdown</button>
+          </div>
+          <div id="inspect-error" role="status" class="inspect-error"></div>
+          <pre id="json-view" tabindex="0">{}</pre>
+          <div class="legend">
+            <strong>One portable document</strong>
+            <p>
+              <code>markDefs</code> shares a link across text runs. List items
+              own their paragraphs. Mentions address rows; attachments identify
+              files.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

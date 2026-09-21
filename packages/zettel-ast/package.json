@@ -9,7 +9,12 @@
 	},
 	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./dist/index.js"
+		".": "./dist/index.js",
+		"./v1": {
+			"types": "./dist/v1/index.d.ts",
+			"import": "./dist/v1/index.js",
+			"default": "./dist/v1/index.js"
+		}
 	},
 	"_filesComment": "Shipping src for better debugging experience",
 	"files": [

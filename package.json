@@ -9,7 +9,11 @@
     "format": "pnpm -r --filter \"./packages/**\" --if-present format",
     "clean": "pnpm -r --filter \"./packages/**\" --if-present clean && rm -rf ./.env ./node_modules",
     "----- CI ---- used to test the codebase on every commit": "",
-    "ci": "pnpm lint && pnpm build && pnpm test"
+    "ci": "pnpm lint && pnpm build && pnpm test",
+    "build:demo": "pnpm --filter @opral/zettel-ast build && pnpm --filter zettel-lix-comments-demo build",
+    "demo": "pnpm build:demo && pnpm --filter zettel-lix-comments-demo start",
+    "test:demo": "pnpm build:demo && pnpm --filter zettel-lix-comments-demo test",
+    "schema:v1": "pnpm --filter @opral/zettel-ast build && node scripts/export-v1-schema.mjs"
   },
   "packageManager": "pnpm@10.23.0",
   "engines": {

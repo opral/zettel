@@ -1,5 +1,3 @@
-> This README describes the legacy package root. The candidate Portable Text–based format is available at `@opral/zettel-ast/v1`; see the [v1 specification](../../spec/v1.md).
-
 # Zettel
 
 A **portable JSON-based rich text AST** to enable interoperability between apps, rich text editors, and other tools - basically Markdown but as an AST spec.
@@ -104,22 +102,22 @@ All other Zettel-reserved properties start with the `zettel_*` prefix. This ensu
 
 ```json
 {
-	"type": "zettel_doc",
-	"content": [
-		{
-			"type": "zettel_text_block",
-			"zettel_key": "x1",
-			"style": "zettel_normal",
-			"children": [
-				{
-					"type": "zettel_span",
-					"zettel_key": "s1",
-					"text": "Hello, world!",
-					"marks": []
-				}
-			]
-		}
-	]
+  "type": "zettel_doc",
+  "content": [
+    {
+      "type": "zettel_text_block",
+      "zettel_key": "x1",
+      "style": "zettel_normal",
+      "children": [
+        {
+          "type": "zettel_span",
+          "zettel_key": "s1",
+          "text": "Hello, world!",
+          "marks": []
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -127,10 +125,12 @@ All other Zettel-reserved properties start with the `zettel_*` prefix. This ensu
 
 ```json
 {
-	"type": "zettel_span",
-	"zettel_key": "s2",
-	"text": "link",
-	"marks": [{ "type": "zettel_link", "zettel_key": "m1", "href": "https://example.com" }]
+  "type": "zettel_span",
+  "zettel_key": "s2",
+  "text": "link",
+  "marks": [
+    { "type": "zettel_link", "zettel_key": "m1", "href": "https://example.com" }
+  ]
 }
 ```
 
@@ -138,10 +138,12 @@ All other Zettel-reserved properties start with the `zettel_*` prefix. This ensu
 
 ```json
 {
-	"type": "zettel_span",
-	"zettel_key": "s3",
-	"text": "@alice",
-	"marks": [{ "type": "custom_mention", "zettel_key": "mention1", "id": "alice" }]
+  "type": "zettel_span",
+  "zettel_key": "s3",
+  "text": "@alice",
+  "marks": [
+    { "type": "custom_mention", "zettel_key": "mention1", "id": "alice" }
+  ]
 }
 ```
 
@@ -197,10 +199,10 @@ Before
 
 ```json
 {
-	"type": "zettel_text_block",
-	"zettel_key": "b1",
-	"style": "zettel_normal",
-	"children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
+  "type": "zettel_text_block",
+  "zettel_key": "b1",
+  "style": "zettel_normal",
+  "children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
 }
 ```
 
@@ -208,10 +210,10 @@ After (style change only)
 
 ```json
 {
-	"type": "zettel_text_block",
-	"zettel_key": "b1",
-	"style": "zettel_quote",
-	"children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
+  "type": "zettel_text_block",
+  "zettel_key": "b1",
+  "style": "zettel_quote",
+  "children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
 }
 ```
 

@@ -1,0 +1,31 @@
+{
+  "format": "zettel",
+  "version": 1,
+  "blocks": [
+    {
+      "_type": "block", "_key": "intro", "style": "normal",
+      "markDefs": [{"_type":"link","_key":"proposal_link","href":"https://example.com/proposal"}],
+      "children": [
+        {"_type":"span","_key":"intro_text","text":"Review ","marks":["proposal_link"]},
+        {"_type":"span","_key":"intro_bold","text":"the proposal","marks":["strong","proposal_link"]}
+      ]
+    },
+    {
+      "_type":"zettel_list", "_key":"steps", "kind":"number", "start":1,
+      "items":[
+        {
+          "_type":"zettel_list_item", "_key":"step_one", "blocks":[
+            {"_type":"block","_key":"step_title","style":"normal","markDefs":[],"children":[{"_type":"span","_key":"step_text","text":"Keep the core vocabulary small.","marks":[]}]},
+            {"_type":"block","_key":"step_detail","style":"normal","markDefs":[],"children":[{"_type":"span","_key":"detail_text","text":"This second paragraph belongs to the same item.","marks":[]}]},
+            {"_type":"zettel_quote","_key":"principle","blocks":[{"_type":"block","_key":"quote_paragraph","style":"normal","markDefs":[],"children":[{"_type":"span","_key":"quote_text","text":"Applications define their own references.","marks":[]}]}]}
+          ]
+        },
+        {
+          "_type":"zettel_list_item", "_key":"step_two", "blocks":[
+            {"_type":"code","_key":"example_code","language":"js","code":"validateDocument(document)"}
+          ]
+        }
+      ]
+    }
+  ]
+}

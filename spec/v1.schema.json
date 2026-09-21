@@ -1,0 +1,409 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "format",
+    "version",
+    "blocks"
+  ],
+  "properties": {
+    "format": {
+      "const": "zettel",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "type": "number"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$id": "T0",
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "style",
+              "children",
+              "markDefs"
+            ],
+            "properties": {
+              "_type": {
+                "const": "block",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "style": {
+                "anyOf": [
+                  {
+                    "const": "normal",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h1",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h2",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h3",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h4",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h5",
+                    "type": "string"
+                  },
+                  {
+                    "const": "h6",
+                    "type": "string"
+                  }
+                ]
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "_type",
+                    "_key",
+                    "text",
+                    "marks"
+                  ],
+                  "properties": {
+                    "_type": {
+                      "const": "span",
+                      "type": "string"
+                    },
+                    "_key": {
+                      "pattern": "^[A-Za-z0-9_-]+$",
+                      "minLength": 1,
+                      "description": "A document-wide unique ASCII node key",
+                      "type": "string"
+                    },
+                    "text": {
+                      "minLength": 1,
+                      "pattern": "^[^\\r]*$",
+                      "description": "Non-empty prose; LF is the hard-break character",
+                      "type": "string"
+                    },
+                    "marks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "markDefs": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "_type",
+                    "_key",
+                    "href"
+                  ],
+                  "properties": {
+                    "_type": {
+                      "const": "link",
+                      "type": "string"
+                    },
+                    "_key": {
+                      "pattern": "^[A-Za-z0-9_-]+$",
+                      "minLength": 1,
+                      "description": "A document-wide unique ASCII node key",
+                      "type": "string"
+                    },
+                    "href": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "kind",
+              "items"
+            ],
+            "properties": {
+              "_type": {
+                "const": "zettel_list",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "kind": {
+                "const": "bullet",
+                "type": "string"
+              },
+              "items": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "_type",
+                    "_key",
+                    "blocks"
+                  ],
+                  "properties": {
+                    "_type": {
+                      "const": "zettel_list_item",
+                      "type": "string"
+                    },
+                    "_key": {
+                      "pattern": "^[A-Za-z0-9_-]+$",
+                      "minLength": 1,
+                      "description": "A document-wide unique ASCII node key",
+                      "type": "string"
+                    },
+                    "blocks": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "$ref": "T0"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "kind",
+              "start",
+              "items"
+            ],
+            "properties": {
+              "_type": {
+                "const": "zettel_list",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "kind": {
+                "const": "number",
+                "type": "string"
+              },
+              "start": {
+                "minimum": 0,
+                "maximum": 2147483647,
+                "type": "integer"
+              },
+              "items": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "_type",
+                    "_key",
+                    "blocks"
+                  ],
+                  "properties": {
+                    "_type": {
+                      "const": "zettel_list_item",
+                      "type": "string"
+                    },
+                    "_key": {
+                      "pattern": "^[A-Za-z0-9_-]+$",
+                      "minLength": 1,
+                      "description": "A document-wide unique ASCII node key",
+                      "type": "string"
+                    },
+                    "blocks": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "$ref": "T0"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "kind",
+              "items"
+            ],
+            "properties": {
+              "_type": {
+                "const": "zettel_list",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "kind": {
+                "const": "check",
+                "type": "string"
+              },
+              "items": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "_type",
+                    "_key",
+                    "blocks",
+                    "checked"
+                  ],
+                  "properties": {
+                    "_type": {
+                      "const": "zettel_list_item",
+                      "type": "string"
+                    },
+                    "_key": {
+                      "pattern": "^[A-Za-z0-9_-]+$",
+                      "minLength": 1,
+                      "description": "A document-wide unique ASCII node key",
+                      "type": "string"
+                    },
+                    "blocks": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "$ref": "T0"
+                      }
+                    },
+                    "checked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "blocks"
+            ],
+            "properties": {
+              "_type": {
+                "const": "zettel_quote",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "$ref": "T0"
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key",
+              "code"
+            ],
+            "properties": {
+              "_type": {
+                "const": "code",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "_type",
+              "_key"
+            ],
+            "properties": {
+              "_type": {
+                "const": "zettel_rule",
+                "type": "string"
+              },
+              "_key": {
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1,
+                "description": "A document-wide unique ASCII node key",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
