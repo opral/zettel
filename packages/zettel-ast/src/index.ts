@@ -1,6 +1,9 @@
 export * from "./schema.js";
-export * from "./builder.js";
-export { toPlainText, fromPlainText } from "./plain-text.js";
-export { validate } from "./validate.js";
-export { nanoid as generateKey } from "./utils/nano-id.js";
-export type { ValidationResult, SerializableError } from "./validate.js";
+export * from "./validate.js";
+import { SCHEMA_URL, type Block, type Document } from "./schema.js";
+export function generateKey(): string {
+	return globalThis.crypto.randomUUID();
+}
+export function createDocument(blocks: Block[] = []): Document {
+	return { $schema: SCHEMA_URL, blocks };
+}

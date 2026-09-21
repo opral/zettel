@@ -395,3 +395,6 @@ artifact/*
 examples/lix-comments/.data/
 examples/lix-comments/app.js
 examples/lix-comments/artifacts/
+
+examples/playground/artifacts/
+examples/playground/dist/

@@ -1,50 +1,66 @@
 # Zettel
 
-A portable JSON rich-text format with a small, specified vocabulary across editors and applications.
+A versioned JSON document format with GFM conversion, semantic HTML, a shared stylesheet, and Lexical editing.
 
-**This development branch defines Zettel v1 as a Portable Text–based profile.** It keeps `block`, `span`, `marks`, and `markDefs`, and specifies explicit lists, list items, quotes, code, and dividers. Applications add their own reference and attachment atoms.
-
-- [Candidate v1 specification](spec/v1.md)
-- [Runnable Lix comments demo](examples/lix-comments/README.md)
-- [Legacy 0.2 format](spec/legacy-0.2.md)
+This development branch is a **breaking replacement**, with no legacy exports or migration layer. It retains Portable Text's shared annotation concept, but uses Zettel's own names and explicit containers. It is not wire-compatible with Portable Text.
 
 ```json
 {
-  "format": "zettel",
-  "version": 1,
+  "$schema": "https://zettel.dev/schema/1/schema.json",
   "blocks": [{
-    "_type": "block",
-    "_key": "paragraph_1",
+    "type": "zettel_text",
+    "zettel_key": "p1",
     "style": "normal",
     "markDefs": [],
     "children": [{
-      "_type": "span",
-      "_key": "text_1",
-      "text": "Portable text, with shared conventions.",
+      "type": "zettel_span",
+      "zettel_key": "s1",
+      "text": "Hello, world.",
       "marks": []
     }]
   }]
 }
 ```
 
-The v1 reference implementation is an explicit subpath:
+The schema URL identifies the contract; this branch does not deploy that URL. The JSON Schema ships as `@opral/zettel-ast/schema.json` and [in the repository](spec/v1.schema.json) for local registration and agent discovery. Applications should map the identifier to the bundled schema without depending on a network request for validation.
+
+| Package | Responsibility |
+| --- | --- |
+| `@opral/zettel-ast` | Types, JSON Schema, identity/reference validation, extension slots |
+| `@opral/zettel-markdown` | GFM import and canonical Markdown export |
+| `@opral/zettel-html` | Static rendering, clipboard HTML fragment conversion, shared CSS |
+| `@opral/zettel-lexical` | Editable nodes, direct document binding, clipboard integration |
 
 ```ts
-import { validateDocument, generateKey } from '@opral/zettel-ast/v1';
+import { fromMarkdown, toMarkdown } from "@opral/zettel-markdown";
+import { toHtml, importHtml } from "@opral/zettel-html";
+import "@opral/zettel-html/style.css";
+
+const document = fromMarkdown("- [x] Ship commenting\n");
+const html = toHtml(document);
+const markdown = toMarkdown(document);
+const pasted = importHtml("<p><strong>Rich</strong> paste</p>");
+// Inspect pasted.diagnostics before accepting a lossy paste.
 ```
 
-An ordered root block array remains simple to store in a JSONB cell. Explicit containers preserve multi-paragraph list items and nested quotes. Block-local link definitions keep one shared link across differently formatted spans. Stable keys identify content independently of its position.
+Read the [format](spec/v1.md), [HTML contract](spec/html-contract.md), [compatibility rules](spec/compatibility.md), and [verification report](spec/VERIFICATION.md).
 
-Zettel specifies data, not a renderer, database, merge algorithm, or asset store. It is not a drop-in replacement for arbitrary Portable Text schemas: custom object renderers must understand its containers, and the envelope is Zettel-specific. Markdown import/export has an explicit supported subset.
-
-## Development
+## Develop
 
 ```sh
 pnpm install
 pnpm build
 pnpm test
+pnpm demo
 ```
 
-The existing package root, `zettel-html`, and `zettel-lexical` retain legacy behavior. They do not consume v1 documents. This draft is intentionally isolated from published consumers; there is no automatic legacy migration or production v1 editor binding yet.
+The playground runs at http://localhost:4176 and shows Markdown, JSON, static HTML, and a Lexical editor. Static content and the editor import the same `@opral/zettel-html/style.css`.
 
-To run the throwaway app, see its [setup and limitations](examples/lix-comments/README.md).
+```sh
+pnpm --filter zettel-playground exec playwright install chromium
+pnpm test:demo
+```
+
+`BROWSER_BIN` can select an installed Chromium executable. Generate the bundled and repository JSON Schemas with `pnpm schema:v1`.
+
+Comments, authorship, reactions, row targets, asset storage, merge algorithms, and ZIP packaging belong to the surrounding application, outside this format.

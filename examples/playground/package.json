@@ -1,0 +1,21 @@
+{
+  "name": "zettel-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4176",
+    "build": "vite build",
+    "test": "node test-browser.mjs"
+  },
+  "dependencies": {
+    "@opral/zettel-ast": "workspace:*",
+    "@opral/zettel-markdown": "workspace:*",
+    "@opral/zettel-html": "workspace:*",
+    "@opral/zettel-lexical": "workspace:*",
+    "lexical": "^0.30.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.0",
+    "@playwright/test": "1.55.1"
+  }
+}

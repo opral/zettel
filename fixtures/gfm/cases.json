@@ -1,0 +1,38 @@
+[
+  {
+    "id": "table-alignment",
+    "source": "| abc | defghi |\n:-: | -----------:\nbar | baz\n"
+  },
+  {
+    "id": "escaped-table-pipe",
+    "source": "| f\\|oo  |\n| ------ |\n| b `\\|` az |\n| b **\\|** im |\n"
+  },
+  {
+    "id": "nested-task-list",
+    "source": "- [x] foo\n  - [ ] bar\n  - [x] baz\n- [ ] bim\n"
+  },
+  {
+    "id": "mixed-ordered-task-list",
+    "source": "3. [ ] first\n4. ordinary\n5. [x] third\n"
+  },
+  {
+    "id": "strikethrough",
+    "source": "~~Hi~~ Hello, world!\n"
+  },
+  {
+    "id": "raw-inline-html",
+    "source": "Foo <responsive-image src=\"foo.jpg\" />\n"
+  },
+  {
+    "id": "hard-break",
+    "source": "foo\\\nbar\n"
+  },
+  {
+    "id": "fenced-code",
+    "source": "~~~js meta=value\nconst x = `|`;\n~~~\n"
+  },
+  {
+    "id": "links-images-and-escapes",
+    "source": "[a \\*link\\*](https://example.com \"title\") ![alt](image.png \"caption\") \\# literal\n"
+  }
+]

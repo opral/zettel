@@ -1,0 +1,405 @@
+import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
+import { chromium } from "@playwright/test";
+const server = await createServer({
+  root: fileURLToPath(new URL(".", import.meta.url)),
+  server: { host: "127.0.0.1", port: 0 },
+});
+await server.listen();
+const address = server.httpServer.address();
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.BROWSER_BIN
+    ? { executablePath: process.env.BROWSER_BIN }
+    : {}),
+});
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const errors = [];
+const checks = [];
+page.on("pageerror", (e) => errors.push(e.message));
+async function applyMarkdown(source) {
+  await page.locator("#markdown").fill(source);
+  await page.locator("#import-markdown").click();
+  await page.waitForTimeout(60);
+  assert.equal(await page.locator("#diagnostics").textContent(), "");
+}
+async function doc() {
+  const result = await page.evaluate(() => {
+    const document = window.zettelPlayground.getDocument();
+    return {
+      document,
+      validation: window.zettelPlayground.validateDocument(document),
+    };
+  });
+  assert.equal(
+    result.validation.ok,
+    true,
+    JSON.stringify(result.validation.errors),
+  );
+  return result.document;
+}
+async function caret(selector, offset) {
+  await page
+    .locator(selector)
+    .first()
+    .evaluate((el, offset) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const text = walker.nextNode();
+      const range = document.createRange();
+      range.setStart(text, offset);
+      range.collapse(true);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      el.closest("[contenteditable=true]").focus();
+    }, offset);
+}
+try {
+  await page.goto(`http://127.0.0.1:${address.port}`);
+  await page.waitForFunction(
+    () => window.zettelPlayground?.getDocument().blocks.length > 0,
+  );
+  assert.equal(await page.locator("#editor h1").count(), 1);
+  assert.equal(await page.locator("#preview h1").count(), 1);
+  assert.equal(await page.locator("#editor table").count(), 1);
+  assert.equal(await page.locator("#diagnostics").textContent(), "");
+  const contentStyles = await page.evaluate(() => {
+    const selectors = ["h1", "h2", "p", "blockquote", "li", "strong", "em", "code"];
+    const styles = (root, selector) => {
+      const node = document.querySelector(root + " " + selector);
+      if (!node) return null;
+      const s = getComputedStyle(node);
+      return {
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        fontStyle: s.fontStyle,
+        lineHeight: s.lineHeight,
+        marginTop: s.marginTop,
+        marginBottom: s.marginBottom,
+      };
+    };
+    return selectors.map((selector) => ({
+      selector,
+      editor: styles("#editor", selector),
+      static: styles("#preview", selector),
+    }));
+  });
+  for (const style of contentStyles)
+    assert.deepEqual(
+      style.editor,
+      style.static,
+      `Shared CSS differs for ${style.selector}`,
+    );
+  checks.push("all four representations load with nested lists and GFM table");
+  await mkdir(new URL("./artifacts/", import.meta.url), { recursive: true });
+  await page.screenshot({
+    path: fileURLToPath(new URL("./artifacts/desktop.png", import.meta.url)),
+    fullPage: true,
+  });
+  await applyMarkdown("Hello world.\n");
+  const initial = await doc();
+  await caret("#editor p", 5);
+  await page.keyboard.type(" brave");
+  await page.waitForTimeout(80);
+  let edited = await doc();
+  assert.equal(edited.blocks[0].zettel_key, initial.blocks[0].zettel_key);
+  assert.equal(
+    edited.blocks[0].children.map((c) => c.text ?? "").join(""),
+    "Hello brave world.",
+  );
+  assert.equal(
+    edited.blocks[0].children[0].zettel_key,
+    initial.blocks[0].children[0].zettel_key,
+  );
+  checks.push("typing changes content and retains existing node identities");
+  await caret("#editor p", 5);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 2);
+  assert.equal(
+    edited.blocks[0].children.map((c) => c.text ?? "").join(""),
+    "Hello",
+  );
+  assert.equal(
+    edited.blocks[1].children.map((c) => c.text ?? "").join(""),
+    " brave world.",
+  );
+  checks.push(
+    "Enter splits text at the caret without moving or dropping trailing content",
+  );
+  await applyMarkdown("Before after.\n");
+  await caret("#editor p", 7);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    dt.setData(
+      "text/html",
+      '<p><strong>PASTED</strong> <a href="https://example.com">link</a><script>window.__pasteExecuted=true</script></p>',
+    );
+    dt.setData("text/plain", "PASTED link");
+    el.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await page.waitForTimeout(100);
+  const text = await page.locator("#editor").innerText();
+  assert.ok(
+    text.indexOf("Before") < text.indexOf("PASTED") &&
+      text.indexOf("PASTED") < text.indexOf("after."),
+  );
+  assert.equal(await page.evaluate(() => window.__pasteExecuted), undefined);
+  assert.ok(
+    (await doc()).blocks.some((b) =>
+      b.children?.some(
+        (c) => c.text?.includes("PASTED") && c.marks.includes("strong"),
+      ),
+    ),
+  );
+  assert.ok(
+    (await page.locator("#diagnostics").textContent()).length > 0,
+    "Paste removal must be visible",
+  );
+  checks.push(
+    "rich paste inserts at selection with formatting, inert script removal and visible diagnostics",
+  );
+  await applyMarkdown("| Left | Right |\n| :--- | ---: |\n| alpha | beta |\n");
+  assert.equal(await page.locator("#editor th").count(), 2);
+  assert.equal(await page.locator("#preview th").count(), 2);
+  assert.equal(await page.locator("#preview table > thead > tr").count(), 1);
+  assert.equal(await page.locator("#preview table > tbody > tr").count(), 1);
+  const style = await page.evaluate(() => {
+    const value = (selector) => {
+      const s = getComputedStyle(document.querySelector(selector));
+      return {
+        fontSize: s.fontSize,
+        lineHeight: s.lineHeight,
+        textAlign: s.textAlign,
+      };
+    };
+    return [value("#editor th:last-child"), value("#preview th:last-child")];
+  });
+  assert.deepEqual(style[0], style[1]);
+  await caret("#editor td", 5);
+  await page.keyboard.type(" edited");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].rows[1].cells[0].children
+      .map((c) => c.text ?? "")
+      .join(""),
+    "alpha edited",
+  );
+  assert.deepEqual(edited.blocks[0].align, ["left", "right"]);
+  checks.push(
+    "table text is editable with preserved alignment and matching shared CSS",
+  );
+  await applyMarkdown("[one **two** three](https://example.com)\n");
+  edited = await doc();
+  assert.equal(edited.blocks[0].markDefs.length, 1);
+  assert.equal(await page.locator("#preview a").count(), 1);
+  await page.locator("#export-markdown").click();
+  assert.equal(await page.locator("#diagnostics").textContent(), "");
+  checks.push("shared link annotations survive editor and Markdown conversion");
+  await applyMarkdown("Hello world.\n");
+  await caret("#editor p", 5);
+  await page.keyboard.press("Shift+Enter");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 1);
+  assert.ok(
+    edited.blocks[0].children.some((node) => node.type === "zettel_break"),
+  );
+  assert.equal(
+    edited.blocks[0].children
+      .filter((node) => node.type === "zettel_span")
+      .map((node) => node.text)
+      .join(""),
+    "Hello world.",
+  );
+  checks.push(
+    "Shift+Enter creates a hard break without splitting the paragraph",
+  );
+
+  await applyMarkdown("- [ ] First second\n- Last\n");
+  await caret("#editor li p", 5);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 1);
+  assert.equal(edited.blocks[0].items.length, 3);
+  assert.equal(
+    edited.blocks[0].items[0].blocks[0].children
+      .map((node) => node.text ?? "")
+      .join(""),
+    "First",
+  );
+  assert.equal(
+    edited.blocks[0].items[1].blocks[0].children
+      .map((node) => node.text ?? "")
+      .join(""),
+    " second",
+  );
+  await page.locator('#editor input[type="checkbox"]').first().click();
+  await page.waitForTimeout(80);
+  assert.equal((await doc()).blocks[0].items[0].checked, true);
+  checks.push(
+    "Enter creates a sibling list item and a real checkbox click updates task state",
+  );
+
+  await applyMarkdown("Before after.\n");
+  await caret("#editor p", 7);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    dt.setData("text/html", "<p>One</p><p>Two</p>");
+    el.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.ok(edited.blocks.length >= 2);
+  const pastedText = edited.blocks
+    .map(
+      (block) => block.children?.map((node) => node.text ?? "").join("") ?? "",
+    )
+    .join("\n");
+  assert.ok(pastedText.indexOf("Before") < pastedText.indexOf("One"));
+  assert.ok(pastedText.indexOf("One") < pastedText.indexOf("Two"));
+  assert.ok(pastedText.indexOf("Two") < pastedText.indexOf("after."));
+  checks.push(
+    "multi-paragraph paste retains every paragraph and trailing destination text",
+  );
+
+  await applyMarkdown("[**bold link**](https://example.com)\n");
+  assert.equal(
+    await page.locator('#editor a[href="https://example.com"]').innerText(),
+    "bold link",
+  );
+  assert.equal(
+    await page.locator('#preview a[href="https://example.com"]').innerText(),
+    "bold link",
+  );
+  checks.push(
+    "decorated links retain anchor semantics in both rendered surfaces",
+  );
+
+  await applyMarkdown("Alpha beta gamma.\n\nSecond paragraph.\n");
+  await page
+    .locator("#editor p")
+    .first()
+    .evaluate((el) => {
+      const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+      const r = document.createRange();
+      r.setStart(t, 6);
+      r.setEnd(t, 10);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      el.closest("[contenteditable=true]").focus();
+    });
+  const copied = await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    el.dispatchEvent(
+      new ClipboardEvent("copy", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    return { plain: dt.getData("text/plain"), json: dt.getData("text/zettel") };
+  });
+  assert.equal(copied.plain, "beta");
+  assert.equal(JSON.parse(copied.json).blocks.length, 1);
+  await caret("#editor p", 6);
+  await page.locator("#editor").evaluate((el, json) => {
+    const dt = new DataTransfer();
+    dt.setData("text/zettel", json);
+    el.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, copied.json);
+  await page.waitForTimeout(80);
+  await doc();
+  checks.push("copy uses only the selection; internal paste remaps identities");
+  await applyMarkdown("Hello world.\n");
+  await page.locator("#editor p").evaluate((el) => {
+    const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+    const r = document.createRange();
+    r.setStart(t, 6);
+    r.setEnd(t, 11);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    el.closest("[contenteditable=true]").focus();
+  });
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.ok(
+    edited.blocks[0].children.some(
+      (c) => c.text === "world" && c.marks.includes("strong"),
+    ),
+  );
+  checks.push(
+    "formatting a selected range exports valid split spans and marks",
+  );
+  await applyMarkdown("```js\nlet x = 1;\n```\n");
+  assert.equal(await page.locator("#editor pre").innerText(), "let x = 1;");
+  await caret("#editor pre", 4);
+  await page.keyboard.type("new_");
+  await page.waitForTimeout(80);
+  assert.equal((await doc()).blocks[0].code, "let new_x = 1;");
+  checks.push("code is editable and does not duplicate its rendered source");
+  await caret("#editor pre", 4);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 1);
+  assert.equal(edited.blocks[0].code, "let \nnew_x = 1;");
+  checks.push("Enter inside code inserts a code newline and retains the block");
+
+  const before = await doc();
+  await page
+    .locator("#json")
+    .fill(JSON.stringify({ ...before, $schema: "https://example.com/future" }));
+  await page.locator("#import-json").click();
+  assert.ok((await page.locator("#diagnostics").textContent()).length > 0);
+  assert.deepEqual(await doc(), before);
+  checks.push(
+    "unsupported schema is retained in JSON pane without replacing editor content",
+  );
+  await page.locator("#load-sample").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: fileURLToPath(new URL("./artifacts/mobile.png", import.meta.url)),
+    fullPage: true,
+  });
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  checks.push("mobile layout has no page overflow");
+  assert.deepEqual(errors, []);
+  const result = { passed: checks.length, checks, pageErrors: errors };
+  await writeFile(
+    new URL("./artifacts/results.json", import.meta.url),
+    JSON.stringify(result, null, 2) + "\n",
+  );
+  console.log(JSON.stringify(result, null, 2));
+} finally {
+  await browser.close();
+  await server.close();
+}

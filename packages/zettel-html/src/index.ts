@@ -1,3 +1,30 @@
-export { validateHtmlString } from "./validate-html-string.js";
-export { toHtmlString, fromHtmlString } from "./html-string.js";
-export { singleNodeToHtmlElement } from "./html-element.js";
+export {
+	fromHtml,
+	importHtml,
+	toHtml,
+	type Diagnostic,
+	type ExtensionHandler,
+	type HtmlExportOptions,
+	type HtmlImportOptions,
+} from "./html.js";
+export type {
+	Block,
+	Break,
+	Code,
+	Document,
+	Extension,
+	Html,
+	Image,
+	Inline,
+	InlineHtml,
+	Link,
+	List,
+	ListItem,
+	Quote,
+	Rule,
+	Span,
+	Table,
+	TableCell,
+	TableRow,
+	TextBlock,
+} from "./types.js";

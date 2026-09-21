@@ -1,0 +1,3 @@
+
+# Upstream conformance inputs deliberately test significant trailing spaces.
+fixtures/gfm/cmark-gfm-spec.txt -whitespace

@@ -1,5 +1,8 @@
 ---
-"@opral/zettel-ast": minor
+"@opral/zettel-ast": major
+"@opral/zettel-html": major
+"@opral/zettel-markdown": minor
+"@opral/zettel-lexical": major
 ---
 
-Add an isolated candidate Zettel v1 API at `@opral/zettel-ast/v1`: Portable Text-compatible prose/annotations, explicit list and quote containers, core JSON Schema, strict semantic validation, and opt-in application atoms. Existing root exports and legacy adapters retain the 0.2 document representation. See the candidate specification for migration and interoperability limits.
+Replace previous Zettel formats and APIs with the versioned JSON Schema document contract: namespaced nodes, stable keys, shared annotations, explicit GFM containers, Markdown conversion, semantic HTML and shared CSS, HTML clipboard import, and direct Lexical editing. This is a breaking replacement with no compatibility or migration layer. The schema identifier's website is not deployed by this change.

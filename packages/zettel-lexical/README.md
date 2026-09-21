@@ -1,38 +1,47 @@
-# Zettel Lexical
+# @opral/zettel-lexical
 
-Mappings for the Zettel AST to the Lexical editor state.
+Lexical bindings for the Zettel document format. Zettel keys are stored as
+editor node data, independently of Lexical's ephemeral node keys, so loading
+and exporting an unchanged document preserves keys and shared `markDefs`
+arrays. Text is represented by real Lexical `TextNode` instances and remains
+editable with the normal Lexical selection, keyboard, and formatting APIs.
 
-## Installation
+```ts
+import {
+  createZettelEditor,
+  loadDocument,
+  exportDocument,
+  registerZettelLexicalPlugin,
+} from "@opral/zettel-lexical";
 
-```bash
-npm install @opral/zettel-ast @opral/zettel-lexical
-```
-
-## Getting started
-
-```tsx
-import { ZettelDoc } from "@opral/zettel-ast";
-import { ZettelNodes, registerZettelLexicalPlugin } from "@opral/zettel-lexical";
-
-
-// register the zettel nodes
-const editor = createEditor({
-  nodes: [...ZettelNodes],
-});
-// register the zettel plugin
+const editor = createZettelEditor();
 registerZettelLexicalPlugin(editor);
+loadDocument(editor, {
+  $schema: "https://zettel.dev/schema/1/schema.json",
+  blocks: [{
+    type: "zettel_text",
+    zettel_key: "intro",
+    style: "normal",
+    markDefs: [],
+    children: [{ type: "zettel_span", zettel_key: "hello", text: "Hello", marks: [] }],
+  }],
+});
+
+const document = exportDocument(editor);
 ```
 
-## Getting the AST
+`createNodeRegistry` accepts explicitly registered extension type names. Raw
+HTML and unregistered extension values are displayed through read-only nodes
+and round-trip in the exported AST. `copyDocumentToClipboard` and
+`pasteClipboardData` expose the same `text/zettel`, HTML, and plain text
+formats used by the plugin. HTML conversion is delegated to
+`@opral/zettel-html`, which also owns the content classes and stylesheet.
+Checklist state can be changed programmatically with
+`setZettelListItemChecked(editor, zettelKey, checked)`; the plugin also wires
+checkbox changes from a mounted editor to that command.
 
-```tsx
-const lexicalState = editor.getEditorState().toJSON();
-const zettelDoc = fromLexicalState(lexicalState);
-```
-
-## Setting the AST
-
-```tsx
-const lexicalState = toLexicalState(zettelDoc);
-editor.setEditorState(editor.parseEditorState(lexicalState));
-```
+Code blocks use editable Lexical text children, while raw block and inline HTML
+and unknown extension nodes stay read-only source atoms. Pasting a document at
+a text caret inserts its inline content at that caret; multi-block pastes use
+Lexical's block insertion behavior. The adapter delegates HTML sanitization and
+rendering to `@opral/zettel-html`.

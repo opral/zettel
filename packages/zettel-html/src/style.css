@@ -1,0 +1,132 @@
+:root {
+	--zettel-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--zettel-font-size: 1rem;
+	--zettel-line-height: 1.55;
+	--zettel-text-color: #1f2937;
+	--zettel-muted-color: #6b7280;
+	--zettel-border-color: #d1d5db;
+	--zettel-code-background: #f3f4f6;
+	--zettel-code-color: #111827;
+	--zettel-link-color: #2563eb;
+}
+
+.zettel {
+	box-sizing: border-box;
+	color: var(--zettel-text-color);
+	font-family: var(--zettel-font-family);
+	font-size: var(--zettel-font-size);
+	line-height: var(--zettel-line-height);
+}
+
+.zettel *,
+.zettel *::before,
+.zettel *::after {
+	box-sizing: inherit;
+}
+
+.zettel_text {
+	margin: 0 0 1em;
+	white-space: normal;
+}
+
+.zettel h1.zettel_text,
+.zettel h2.zettel_text,
+.zettel h3.zettel_text,
+.zettel h4.zettel_text,
+.zettel h5.zettel_text,
+.zettel h6.zettel_text {
+	line-height: 1.25;
+}
+
+.zettel a {
+	color: var(--zettel-link-color);
+}
+
+.zettel_image {
+	max-width: 100%;
+}
+
+.zettel_list {
+	margin: 0 0 1em;
+	padding-inline-start: 2em;
+}
+
+.zettel_list_item {
+	margin: 0 0 0.35em;
+}
+
+.zettel_list_item.zettel_task_item,
+.zettel_list_item[data-checked="true"],
+.zettel_list_item[data-checked="false"] {
+	list-style: none;
+	position: relative;
+}
+
+.zettel_task_item > input[type="checkbox"],
+.zettel_list_item[data-checked] > input[type="checkbox"] {
+	position: absolute;
+	inset-inline-start: -1.5em;
+	margin-block-start: 0.35em;
+}
+
+.zettel_list[data-tight="true"] > .zettel_list_item > .zettel_text,
+.zettel_list_item[data-tight="true"] > .zettel_text {
+	margin-bottom: 0;
+}
+
+.zettel_quote {
+	border-inline-start: 0.25rem solid var(--zettel-border-color);
+	color: var(--zettel-muted-color);
+	margin: 0 0 1em;
+	padding-inline-start: 1em;
+}
+
+.zettel_code,
+.zettel_html {
+	background: var(--zettel-code-background);
+	color: var(--zettel-code-color);
+	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+	overflow-x: auto;
+	padding: 0.75em;
+	white-space: pre-wrap;
+}
+
+.zettel_code code,
+.zettel_html code,
+.zettel_html_inline {
+	font-family: inherit;
+}
+
+.zettel_rule {
+	border: 0;
+	border-top: 1px solid var(--zettel-border-color);
+	margin: 1em 0;
+}
+
+.zettel_table {
+	border-collapse: collapse;
+	margin: 0 0 1em;
+	max-width: 100%;
+	width: 100%;
+}
+
+.zettel_table th,
+.zettel_table td {
+	border: 1px solid var(--zettel-border-color);
+	padding: 0.35em 0.6em;
+	text-align: start;
+	vertical-align: top;
+}
+
+.zettel_table th[align="left"],
+.zettel_table td[align="left"] { text-align: left; }
+.zettel_table th[align="right"],
+.zettel_table td[align="right"] { text-align: right; }
+.zettel_table th[align="center"],
+.zettel_table td[align="center"] { text-align: center; }
+
+.zettel_html,
+.zettel_html_inline {
+	/* Raw HTML is source text and is intentionally read-only. */
+	user-select: text;
+}

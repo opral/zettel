@@ -18,7 +18,7 @@ jobs:
         with:
           version: 10.23.0
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -29,3 +29,9 @@ jobs:
 
       - name: Run CI
         run: pnpm run ci
+
+      - name: Install browser for editor checks
+        run: pnpm --filter zettel-playground exec playwright install --with-deps chromium
+
+      - name: Test editor and shared rendering in Chromium
+        run: pnpm --filter zettel-playground test
