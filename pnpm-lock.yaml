@@ -12,6 +12,31 @@ importers:
         specifier: ^2.29.7
         version: 2.29.8(@types/node@25.0.3)
 
+  examples/lix-comments:
+    dependencies:
+      '@opral/zettel-ast':
+        specifier: workspace:*
+        version: link:../../packages/zettel-ast
+      '@opral/zettel-html':
+        specifier: workspace:*
+        version: link:../../packages/zettel-html
+      '@opral/zettel-lexical':
+        specifier: workspace:*
+        version: link:../../packages/zettel-lexical
+      '@opral/zettel-markdown':
+        specifier: workspace:*
+        version: link:../../packages/zettel-markdown
+      lexical:
+        specifier: ^0.30.0
+        version: 0.30.0
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.55.1
+        version: 1.55.1
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.1(@types/node@25.0.3)
+
   examples/playground:
     dependencies:
       '@opral/zettel-ast':
