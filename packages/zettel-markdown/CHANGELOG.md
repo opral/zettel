@@ -1,4 +1,4 @@
-# @opral/zettel-lexical
+# @opral/zettel-markdown
 
 ## 1.1.0
 
@@ -10,12 +10,3 @@
 
 - Updated dependencies [4054023]
   - @opral/zettel-ast@1.1.0
-  - @opral/zettel-html@1.1.0
-
-## 0.0.1
-
-### Patch Changes
-
-- Updated dependencies [57e6245]
-  - @opral/zettel-ast@0.2.0
-  - @opral/zettel-html@0.1.1
