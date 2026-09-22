@@ -1,0 +1,1146 @@
+{
+  "generatedAt": "2026-09-21T17:52:46.344Z",
+  "durationMs": 21146,
+  "plugins": [
+    {
+      "key": "plugin_markdown",
+      "sha256": "e2e81f378eae4a895a2ccf4897959d0697678752d2ead6747db785769c4fe875"
+    },
+    {
+      "key": "plugin_csv",
+      "sha256": "bf368f8f238625c1e4a6f672480ff1050113746537bf42aca07c92e40808ef3f"
+    }
+  ],
+  "results": [
+    {
+      "kind": "markdown",
+      "name": "sql content edit",
+      "mode": "sql",
+      "expectation": "edited",
+      "expected": "Ship on Tuesday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Tuesday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Tuesday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Tuesday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "sql reorder",
+      "mode": "sql",
+      "expectation": "same",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nClosing notes.\n\nShip on Monday.\n",
+      "resolvedContent": "Ship on Monday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday.",
+          "order": "f0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file content edit",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Ship on Tuesday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Tuesday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Tuesday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Tuesday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file insert before",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nNew introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Monday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-1514-7807-9eac-6b9500000000",
+          "content": "New introduction.",
+          "order": "60"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file reorder",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nClosing notes.\n\nShip on Monday.\n",
+      "resolvedContent": "Ship on Monday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "60"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday.",
+          "order": "80"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file delete target",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nClosing notes.\n",
+      "resolvedContent": null,
+      "candidates": [],
+      "outcome": "detached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "delete then reinsert identical",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "resolvedContent": null,
+      "candidates": [
+        "01a0c519-1fec-7022-b110-e05500000000"
+      ],
+      "outcome": "detached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-1fec-7022-b110-e05500000000",
+          "content": "Ship on Monday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file duplicate target",
+      "mode": "file",
+      "expectation": "ambiguous",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Monday.\n\nShip on Monday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Monday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002",
+        "01a0c519-237d-75c7-8107-593600000000"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": null,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-237d-75c7-8107-593600000000",
+          "content": "Ship on Monday.",
+          "order": "a0"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file duplicate then edit original",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Ship on Tuesday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Tuesday.\n\nShip on Monday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Tuesday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Tuesday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-272c-7551-bb32-bf3b00000000",
+          "content": "Ship on Monday.",
+          "order": "a0"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file replace unrelated content",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nEntirely unrelated replacement.\n\nClosing notes.\n",
+      "resolvedContent": "Entirely unrelated replacement.",
+      "candidates": [],
+      "outcome": "retargeted",
+      "meetsExpectation": false,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Entirely unrelated replacement.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "file reorder and edit",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Ship on Tuesday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nClosing notes.\n\nShip on Tuesday.\n",
+      "resolvedContent": "Ship on Tuesday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "60"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Tuesday.",
+          "order": "80"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "paragraph split",
+      "mode": "file",
+      "expectation": "ambiguous",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on\n\nMonday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on",
+      "candidates": [],
+      "outcome": "retargeted",
+      "meetsExpectation": null,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-3227-7923-b48a-6a7200000000",
+          "content": "Monday.",
+          "order": "a0"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "paragraph merge",
+      "mode": "file",
+      "expectation": "ambiguous",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Monday. Closing notes.\n",
+      "resolvedContent": "Ship on Monday. Closing notes.",
+      "candidates": [],
+      "outcome": "retargeted",
+      "meetsExpectation": null,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday. Closing notes.",
+          "order": "80"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "rename file",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Ship on Monday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Monday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Monday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "markdown",
+      "name": "branch edit and merge",
+      "mode": "sql",
+      "expectation": "edited",
+      "expected": "Ship on Tuesday.",
+      "targetId": "01a0c519-050e-746e-9bf0-f71b00000002",
+      "targetRef": "lix_row_ref:v1:AAAADW1hcmtkb3duX25vZGUAAQEBoMUZBQ50bpvw9xsAAAAC",
+      "before": "Introduction.\n\nShip on Monday.\n\nClosing notes.\n",
+      "after": "Introduction.\n\nShip on Tuesday.\n\nClosing notes.\n",
+      "resolvedContent": "Ship on Tuesday.",
+      "candidates": [
+        "01a0c519-050e-746e-9bf0-f71b00000002"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000001",
+          "content": "Introduction.",
+          "order": "40"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000002",
+          "content": "Ship on Tuesday.",
+          "order": "80"
+        },
+        {
+          "id": "01a0c519-050e-746e-9bf0-f71b00000003",
+          "content": "Closing notes.",
+          "order": "c0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Ship on Monday.",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "sql content edit",
+      "mode": "sql",
+      "expectation": "edited",
+      "expected": "Design,150",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,150\nEngineering,200\n",
+      "resolvedContent": "Design,150",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,150",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "sql reorder",
+      "mode": "sql",
+      "expectation": "same",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nEngineering,200\nDesign,100\n",
+      "resolvedContent": "Design,100",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,100",
+          "order": "f0"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file content edit",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Design,150",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,150\nEngineering,200\n",
+      "resolvedContent": "Design,150",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,150",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file insert before",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nResearch,50\nDesign,100\nEngineering,200\n",
+      "resolvedContent": "Design,100",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-43d2-7395-b473-053500000000",
+          "content": "Research,50",
+          "order": "5fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,100",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file reorder",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nEngineering,200\nDesign,100\n",
+      "resolvedContent": "Design,100",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,100",
+          "order": "dfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file delete target",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nEngineering,200\n",
+      "resolvedContent": null,
+      "candidates": [],
+      "outcome": "detached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "delete then reinsert identical",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,100\nEngineering,200\n",
+      "resolvedContent": null,
+      "candidates": [
+        "01a0c519-48da-7f9a-acfd-c77c00000000"
+      ],
+      "outcome": "detached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-48da-7f9a-acfd-c77c00000000",
+          "content": "Design,100",
+          "order": "8000000000000001"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file duplicate target",
+      "mode": "file",
+      "expectation": "ambiguous",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,100\nDesign,100\nEngineering,200\n",
+      "resolvedContent": "Design,100",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001",
+        "01a0c519-4a7f-73b2-bdb2-5c0d00000000"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": null,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,100",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-4a7f-73b2-bdb2-5c0d00000000",
+          "content": "Design,100",
+          "order": "9fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file duplicate then edit original",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Design,150",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,150\nDesign,100\nEngineering,200\n",
+      "resolvedContent": "Design,150",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,150",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-4c22-7cdc-84b9-348e00000000",
+          "content": "Design,100",
+          "order": "9fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file replace unrelated content",
+      "mode": "file",
+      "expectation": "deleted",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nMarketing,999\nEngineering,200\n",
+      "resolvedContent": "Marketing,999",
+      "candidates": [],
+      "outcome": "retargeted",
+      "meetsExpectation": false,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Marketing,999",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "file reorder and edit",
+      "mode": "file",
+      "expectation": "edited",
+      "expected": "Design,150",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nEngineering,200\nDesign,150\n",
+      "resolvedContent": "Design,150",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,150",
+          "order": "dfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "rename file",
+      "mode": "file",
+      "expectation": "same",
+      "expected": "Design,100",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,100\nEngineering,200\n",
+      "resolvedContent": "Design,100",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,100",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    },
+    {
+      "kind": "csv",
+      "name": "branch edit and merge",
+      "mode": "sql",
+      "expectation": "edited",
+      "expected": "Design,150",
+      "targetId": "01a0c519-06b8-7528-8b05-a22a00000001",
+      "targetRef": "lix_row_ref:v1:AAAAB2Nzdl9yb3cAAQEBoMUZBrh1KIsFoioAAAAB",
+      "before": "team,budget\nDesign,100\nEngineering,200\n",
+      "after": "team,budget\nDesign,150\nEngineering,200\n",
+      "resolvedContent": "Design,150",
+      "candidates": [
+        "01a0c519-06b8-7528-8b05-a22a00000001"
+      ],
+      "outcome": "attached",
+      "meetsExpectation": true,
+      "rows": [
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000000",
+          "content": "team,budget",
+          "order": "3fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000001",
+          "content": "Design,150",
+          "order": "7fffffffffffffff"
+        },
+        {
+          "id": "01a0c519-06b8-7528-8b05-a22a00000002",
+          "content": "Engineering,200",
+          "order": "bfffffffffffffff"
+        }
+      ],
+      "reopenRefUnchanged": true,
+      "commentRetained": true,
+      "historicalContent": "Design,100",
+      "checkpointCommentRetained": true,
+      "checkpointRetained": true,
+      "reopenResolutionUnchanged": true
+    }
+  ]
+}

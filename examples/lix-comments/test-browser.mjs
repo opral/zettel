@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { chromium } from '@playwright/test';
+import { startServer } from './server.mjs';
+import { initialMarkdown } from './model.mjs';
+import { fromMarkdown, toMarkdown } from '@opral/zettel-markdown';
+const directory = await mkdtemp(join(tmpdir(), 'zettel-comment-browser-'));
+let app, browser;
+const checks = [], errors = [];
+try {
+  app = await startServer({ port: 0, path: join(directory, 'browser.lix') });
+  browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_BIN ? { executablePath: process.env.BROWSER_BIN } : {}) });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('dialog', dialog => dialog.accept());
+  await page.goto(app.url);
+  await page.locator('[data-target="checkpoint"]').waitFor();
+  // Regression: type directly into the untouched composer, without importing content.
+  await page.locator('#editor').click();
+  await page.keyboard.type('Fresh comment');
+  await page.waitForFunction(() => document.querySelector('#json').value.includes('Fresh comment'), null, { timeout: 3000 });
+  await page.locator('#save').click();
+  await page.waitForFunction(() => document.querySelector('#comments').textContent.includes('Fresh comment'));
+  await page.locator('#editor').click();
+  await page.keyboard.type('Second draft');
+  await page.waitForFunction(() => document.querySelector('#json').value.includes('Second draft'));
+  checks.push('Fresh empty composer and post-save reset both accept direct keyboard typing');
+  // Remove only the regression fixture in this disposable test database.
+  await app.model.serial(async () => {
+    await app.model.lix.execute('DELETE FROM demo_comment');
+    await app.model.save();
+  });
+  await page.reload();
+  await page.locator('[data-target="checkpoint"]').waitFor();
+  const targets = (await (await page.request.get(`${app.url}/api/state`)).json()).conversations;
+  const savedIds = [];
+  for (const target of ['checkpoint', 'paragraph', 'csv']) {
+    await page.locator(`[data-target="${target}"]`).click();
+    const details = page.locator('.composer details');
+    if (!(await details.evaluate(node => node.open))) await details.locator('summary').click();
+    await page.locator('#markdown').fill(initialMarkdown);
+    await page.locator('#import-md').click();
+    const original = JSON.parse(await page.locator('#json').inputValue());
+    assert.equal(original._type, 'zettel_doc');
+    // Real contenteditable typing; then save through the HTTP API into native Lix.
+    await page.locator('#editor').click();
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.type('Edited ');
+    await page.waitForFunction(() => document.querySelector('#json').value.includes('Edited '));
+    const expected = JSON.parse(await page.locator('#json').inputValue());
+    assert.equal(expected.blocks[0]._key, original.blocks[0]._key);
+    await page.locator('#save').click();
+    await page.waitForFunction(() => document.querySelector('#comments article'));
+    const saved = (await (await page.request.get(`${app.url}/api/state`)).json()).comments.find(c => c.conversation_id === target);
+    assert.deepEqual(saved.body, expected);
+    savedIds.push(saved.id);
+    assert.equal(await page.locator('#error').textContent(), '');
+    await page.reload();
+    await page.locator(`[data-target="${target}"]`).click();
+    await page.locator(`#comments article[data-comment-id="${saved.id}"] button`).click();
+    assert.deepEqual(JSON.parse(await page.locator('#json').inputValue()), expected);
+    await page.locator('#editor').click();
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.type('Revised ');
+    await page.waitForFunction(() => document.querySelector('#json').value.includes('Revised '));
+    const revised = JSON.parse(await page.locator('#json').inputValue());
+    if (!(await details.evaluate(node => node.open))) await details.locator('summary').click();
+    await page.locator('#export-md').click();
+    const markdown = await page.locator('#markdown').inputValue();
+    assert.equal(toMarkdown(fromMarkdown(markdown)), toMarkdown(revised));
+    await page.locator('#save').click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent === 'Saved to Lix' && !document.querySelector('#save').disabled);
+    const current = (await (await page.request.get(`${app.url}/api/state`)).json());
+    assert.equal(current.comments.filter(c => c.conversation_id === target).length, 1);
+    assert.deepEqual(current.comments.find(c => c.id === saved.id).body, revised);
+    assert.deepEqual(current.conversations, targets);
+    checks.push(`${target}: GFM import → real Lexical typing → JSONB save → reload → edit same ID → Markdown export; target and node identity retained`);
+  }
+  const final = await (await page.request.get(`${app.url}/api/state`)).json();
+  await app.close();
+  app = await startServer({ port: 0, path: join(directory, 'browser.lix') });
+  await page.goto(app.url);
+  await page.locator('[data-target="checkpoint"]').waitFor();
+  assert.deepEqual(await (await page.request.get(`${app.url}/api/state`)).json(), final);
+  checks.push('All comments and conversation targets survive full server shutdown/restart');
+  await mkdir(new URL('./artifacts/', import.meta.url), { recursive: true });
+  await page.screenshot({ path: new URL('./artifacts/current-desktop.png', import.meta.url).pathname, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: new URL('./artifacts/current-mobile.png', import.meta.url).pathname, fullPage: true });
+  assert.deepEqual(errors, []);
+  checks.push('Mobile layout fits viewport and browser reports no uncaught errors');
+  const result = { passed: checks.length, checks, pageErrors: errors, savedIds };
+  await writeFile(new URL('./artifacts/current-browser-results.json', import.meta.url), JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result, null, 2));
+} finally { if (browser) await browser.close(); if (app) await app.close(); await rm(directory, { recursive: true, force: true }); }

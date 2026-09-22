@@ -1,117 +1,50 @@
 # Zettel
 
-A **portable JSON-based rich text AST** to enable interoperability between apps, rich text editors, and other tools - basically Markdown but as an AST spec.
+A **portable JSON format for rich text**, designed for storage, interchange, and editing across applications. Author in Markdown or JSON, edit with Lexical, and render as HTML.
 
-> **Zettel** is German for "a scrap of paper that anything can be written on."
+> **Zettel** is German for “a scrap of paper that anything can be written on.”
 
-Zettel is the outcome of analyzing numerous rich text ASTs and editors. No common AST exists to express rich text. Zettel aims to become this shared spec for rich text, just like Markdown is for plain text.
+Zettel defines a shared document model independently of any editor or database. It standardizes the nodes needed for GitHub Flavored Markdown (GFM), with extension points for application-specific content.
 
 ## 🧩 Why Zettel?
 
-One rich text document format. Many editors. Zero reinventing the wheel.
+One document format for storage, agents, editors, and rendering.
 
-- 📦 Portable — serialize anywhere, validate everywhere
-- 🔧 Extensible — just define new `type` nodes
-- 🧘 Flexible — unknown nodes won’t break your app
-- 📐 Structured — shared schema, unique keys, typed marks
+- 📦 **Portable** — store documents as JSON in a database row, file, or API response.
+- 🔍 **Explicit** — `_type: "zettel_doc"` identifies a Zettel document.
+- 🔧 **Extensible** — register application-specific block and inline node types.
+- 📐 **Structured** — explicit containers, stable keys, and shared link annotations.
+- 🔄 **Interoperable** — GFM import/export, HTML import/rendering, and Lexical bindings.
+- 🎨 **Consistent styling** — one content stylesheet for static HTML and the editor.
 
-### Problems of existing solutions (and how Zettel solves them)
+## 🚚 Interoperability principles
 
-| Problem                                                                                        | Zettel Fix                           |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------ |
-| [Markdown & HTML are unsuited](https://www.smashingmagazine.com/2022/02/thoughts-on-markdown/) | Explicit JSON nodes                  |
-| Every app builds its own AST                                                                   | Shared spec with extensibility       |
-| Editor-tied formats like Slate/Lexical can't be shared                                         | Editor-agnostic, storage-first model |
-| Other spec's don't define common nodes                                                         | `zettel_*` node spec with guarantees |
+| Principle | Practice |
+| --- | --- |
+| **Document wrapper** | `{ "_type": "zettel_doc", "blocks": […] }` identifies the document and holds its ordered blocks. |
+| **Stable identities** | Every content node and annotation definition has a document-unique `_key`. |
+| **Explicit structure** | Lists, list items, quotes, and tables own their children, including nested blocks. |
+| **Namespaced types** | Built-in types use `zettel_*`; application types use their own names. |
+| **Preserve unknown content** | Retain unsupported payloads as read-only content or reject the operation explicitly. Never silently discard them. |
+| **Validation** | JSON Schema describes shapes; runtime validation also checks keys, annotation references, and table dimensions. |
 
-## 🚚 Interoperability Principles
+Documents currently carry neither `$schema` nor `version`; applications select the schema they support. The root has no `_key`. Keys identify content across edits; they do not provide a merge algorithm.
 
-| Principle                     | Practice                                                                | Why it matters                                    |
-| ----------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
-| **1. Single wrapper**         | Root node: `{ type: "zettel_doc", content: [...] }`                     | Recognizable file type, room for metadata         |
-| **2. Universal keys**         | Every node/mark has a unique `zettel_key`                               | Enables merging, diffing, comments, anchoring     |
-| **3. Flat block array**       | Top-level `content` is always an array                                  | Easy to stream, diff, or patch                    |
-| **4. Namespaced types**       | Built-ins use `zettel_*`; everything else is vendor space               | Tools can skip unknowns, preserve them round-trip |
-| **5. Graceful fallback**      | Unknown blocks are ignored; unknown marks are stripped but text remains | Always renders, even with unknown content         |
-| **6. JSON Schema validation** | Canonical spec with runtime validation + TS types                       | Fail fast, validate early, ensure compatibility   |
-
-## 🔄 What graceful fallback looks like
-
-| Original JSON                                                              | Viewer knows it?  | Render result                  |
-| -------------------------------------------------------------------------- | ----------------- | ------------------------------ |
-| `{ "type": "custom_video_viewer", "src": "…" }`                            | ✅ Yes            | Inline video player            |
-| same                                                                       | ❌ No             | `<div>Unsupported block</div>` |
-| `{ "type": "zettel_span", text: "@Max", marks: [{type: "acme_mention"}] }` | ✅ Custom editor  | `@Max` (styled mention)        |
-| same                                                                       | ❌ Generic editor | `@Max` (plain text)            |
-
-> ✅ Text is never lost. Unknown nodes are preserved and round-tripped safely.
-
-## 🧠 Core Design
-
-Zettel is designed for easy parsing, transformation, and interoperability.
-
-- **Flat block list** — no nested trees
-- **Editor-agnostic** — serialize anywhere, render everywhere
-- **Typed nodes** — built-in types use the `zettel_` prefix
-- **Every node has a unique key** — great for diffs, comments, and syncing
-
-### 🧾 Node rules (spec)
-
-Every node MUST contain:
-
-- `type` (string) – a namespaced identifier (e.g. "zettel_text_block", "acme_widget")
-- `zettel_key` (string) – a unique key within the document
-
-All other Zettel-reserved properties start with the `zettel_*` prefix. This ensures future compatibility and avoids naming collisions.
-
-## 🧱 Built-in Nodes
-
-### `zettel_text_block`
-
-```ts
-{
-  type: "zettel_text_block",
-  zettel_key: "id",
-  style: "zettel_normal", // or zettel_h1, zettel_quote, etc.
-  children: [ZettelSpan]
-}
-```
-
-### `zettel_span`
-
-```ts
-{
-  type: "zettel_span",
-  zettel_key: "id",
-  text: "Hello",
-  marks: [ZettelMark]
-}
-```
-
-#### Mark examples
-
-```ts
-{ type: "zettel_bold",   zettel_key: "m1" }
-{ type: "zettel_italic", zettel_key: "m2" }
-{ type: "zettel_link",   zettel_key: "m3", href: "https://…" }
-```
-
-## ✨ Examples
-
-### Basic text block
+## ✨ A document
 
 ```json
 {
-  "type": "zettel_doc",
-  "content": [
+  "_type": "zettel_doc",
+  "blocks": [
     {
-      "type": "zettel_text_block",
-      "zettel_key": "x1",
-      "style": "zettel_normal",
+      "_type": "zettel_block",
+      "_key": "p1",
+      "style": "normal",
+      "markDefs": [],
       "children": [
         {
-          "type": "zettel_span",
-          "zettel_key": "s1",
+          "_type": "zettel_span",
+          "_key": "s1",
           "text": "Hello, world!",
           "marks": []
         }
@@ -121,100 +54,153 @@ All other Zettel-reserved properties start with the `zettel_*` prefix. This ensu
 }
 ```
 
-### Rich marks
+Paragraphs and headings share `zettel_block`. Changing `style` from `normal` to `h1` preserves the block’s identity. Quotes and lists are containers because they can contain multiple blocks.
+
+## 🧱 Built-in nodes
+
+| Content | Representation |
+| --- | --- |
+| Paragraphs and headings | `zettel_block`, with `normal` or `h1`–`h6` style |
+| Text | `zettel_span` |
+| Hard line breaks | `zettel_break` |
+| Links | `zettel_link` definitions referenced through `marks` |
+| Images | `zettel_image` |
+| Ordered, unordered, and task lists | `zettel_list` and `zettel_list_item`; task state belongs to the item |
+| Blockquotes | `zettel_quote` |
+| Fenced or indented code | `zettel_code`, with optional language and metadata |
+| Thematic breaks | `zettel_rule` |
+| Tables | `zettel_table`, `zettel_table_row`, and `zettel_table_cell`, with column alignment |
+| Raw HTML source | `zettel_html` and `zettel_html_inline` |
+
+List items can contain multiple paragraphs, nested lists, quotes, and other blocks. Soft line breaks remain LF characters in text; hard breaks have an explicit node.
+
+### Marks and shared annotations
+
+`marks` contains decorator strings (`strong`, `em`, `strike-through`, `code`) and references to local annotation definitions. Link objects live in the enclosing text block or table cell’s `markDefs`.
 
 ```json
 {
-  "type": "zettel_span",
-  "zettel_key": "s2",
-  "text": "link",
-  "marks": [
-    { "type": "zettel_link", "zettel_key": "m1", "href": "https://example.com" }
+  "_type": "zettel_block",
+  "_key": "p2",
+  "style": "normal",
+  "markDefs": [
+    {
+      "_type": "zettel_link",
+      "_key": "link1",
+      "href": "https://example.com"
+    }
+  ],
+  "children": [
+    {
+      "_type": "zettel_span",
+      "_key": "s2",
+      "text": "Read the ",
+      "marks": ["link1"]
+    },
+    {
+      "_type": "zettel_span",
+      "_key": "s3",
+      "text": "proposal",
+      "marks": ["link1", "strong"]
+    }
   ]
 }
 ```
 
-### Custom marks
+Both spans share one link while retaining different formatting. This follows Portable Text’s shared annotation approach; Zettel’s vocabulary and container model are its own format.
 
-```json
-{
-  "type": "zettel_span",
-  "zettel_key": "s3",
-  "text": "@alice",
-  "marks": [
-    { "type": "custom_mention", "zettel_key": "mention1", "id": "alice" }
-  ]
-}
+## 🔄 Markdown and HTML
+
+```ts
+import { fromMarkdown, toMarkdown } from "@opral/zettel-markdown";
+import { toHtml, importHtml } from "@opral/zettel-html";
+import "@opral/zettel-html/style.css";
+
+const document = fromMarkdown("# Hello\n\n- [x] Ship commenting\n");
+const markdown = toMarkdown(document);
+const html = toHtml(document);
+
+const pasted = importHtml("<p><strong>Rich</strong> paste</p>");
+// Inspect pasted.diagnostics for unsupported or removed content.
 ```
+
+Markdown export is canonical: delimiter choices and source layout can change. Markdown import creates fresh keys. Use JSON when identities and extension payloads must survive unchanged. Unsupported JSON-to-Markdown conversions fail explicitly.
+
+HTML import supports rich clipboard fragments and reports lossy conversions. Raw HTML nodes retain their source but render as escaped, inert content by default.
+
+## ✍️ Lexical editing
+
+```ts
+import {
+  createZettelEditor,
+  registerZettelLexicalPlugin,
+  loadDocument,
+  exportDocument,
+} from "@opral/zettel-lexical";
+import "@opral/zettel-html/style.css";
+
+const editor = createZettelEditor();
+editor.setRootElement(documentElement);
+const unregister = registerZettelLexicalPlugin(editor);
+
+loadDocument(editor, document);
+const updatedDocument = exportDocument(editor);
+```
+
+The binding uses editable Lexical nodes and preserves Zettel identities independently of Lexical’s internal keys. Static HTML and the editor share content classes and a stylesheet; editor-specific DOM wrappers may differ.
 
 ## 🔧 Extending Zettel
 
-You can define custom marks or blocks.
-
-### Custom mark example
-
-```ts
-{
-  type: "emoji_mark",
-  zettel_key: "m4",
-  emoji: "🚩"
-}
-```
-
-### Use it in a span
-
-```ts
-{
-  type: "zettel_span",
-  zettel_key: "s1",
-  text: "important",
-  marks: [{ type: "emoji_mark", zettel_key: "m4", emoji: "🚩" }]
-}
-```
-
-### Custom block example
-
-```ts
-{
-  type: "code_block",
-  zettel_key: "cb1",
-  code: "console.log()",
-  language: "js"
-}
-```
-
-_Generic editors will skip unknown blocks, but text remains readable and round-trappable._
-
-## 🔁 Blocks vs. Styles for Diffing
-
-Zettel models textual blocks with a single type (`zettel_text_block`) and separates their presentation using a `style` field. This separation makes diffs cleaner and identities stable.
-
-- Stable identity: the block keeps the same `zettel_key` even when the style changes (e.g., normal → quote → heading).
-- Smaller change sets: style flips are a single modification, not a delete+add+reorder at the document level.
-- Simpler merging: downstream tools can treat style changes as non-structural updates to the same block.
-
-Example: paragraph → blockquote
-
-Before
+Applications can define block or inline atoms outside the reserved `zettel_` namespace:
 
 ```json
 {
-  "type": "zettel_text_block",
-  "zettel_key": "b1",
-  "style": "zettel_normal",
-  "children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
+  "_type": "acme_attachment",
+  "_key": "attachment1",
+  "file_id": "file123",
+  "label": "Project brief.pdf"
 }
 ```
 
-After (style change only)
+Register the type’s JSON Schema and runtime payload validator in your application profile. Add rendering or conversion handlers where needed. Core nodes remain closed objects; defining a custom type does not automatically give an editor or Markdown exporter its semantics.
 
-```json
-{
-  "type": "zettel_text_block",
-  "zettel_key": "b1",
-  "style": "zettel_quote",
-  "children": [{ "type": "zettel_span", "zettel_key": "s1", "text": "Hello" }]
-}
+The Lexical binding preserves unknown application atoms as read-only content. Core-only validation rejects unregistered types. Invalid document roots are rejected.
+
+See [compatibility and extensions](spec/compatibility.md).
+
+## 📦 Packages
+
+| Package | Responsibility |
+| --- | --- |
+| `@opral/zettel-ast` | Types, JSON Schema, runtime validation, and extension slots |
+| `@opral/zettel-markdown` | GFM import and canonical Markdown export |
+| `@opral/zettel-html` | HTML rendering, fragment import, and shared CSS |
+| `@opral/zettel-lexical` | Editing bindings, document conversion, and clipboard integration |
+
+Zettel describes document content. Comments, authorship, reactions, attachment storage, access control, and version-control merging belong to the surrounding application.
+
+## 🛠️ Develop
+
+```sh
+pnpm install
+pnpm build
+pnpm test
+pnpm demo
 ```
 
-Contrast: ASTs that use different node types for paragraph vs. blockquote typically require a deletion (paragraph), an insertion (blockquote), and a document order update — creating noisier diffs and losing block identity. Zettel keeps the block identity intact by expressing presentation as `style`.
+The [local playground](http://localhost:4176) shows Markdown, JSON, a Lexical editor, and static HTML side by side.
+
+```sh
+pnpm --filter zettel-playground exec playwright install chromium
+pnpm test:demo
+```
+
+`BROWSER_BIN` can select an existing Chromium executable. Generate the bundled schema with `pnpm schema:v1`.
+
+## Specification and status
+
+Read the [format specification](spec/v1.md), [JSON Schema](spec/v1.schema.json), [HTML contract](spec/html-contract.md), and [verification report](spec/VERIFICATION.md).
+
+This development version replaces earlier Zettel formats and APIs without backward compatibility. The schema ships as `@opral/zettel-ast/schema.json`; its public URL is an identifier whose hosting is not deployed by this branch. Register the bundled schema locally for validation.
+
+Verification includes 61 package tests, semantic round trips across 672 upstream GFM examples, and 16 Chromium scenarios. The verification report records the review findings, fixes, and remaining editor limitations.

@@ -1,25 +1,35 @@
 {
   "name": "@opral/zettel-lexical",
-  "private": true,
   "version": "0.0.1",
   "type": "module",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/opral/zettel"
   },
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist",
+    "src",
+    "!dist/**/*.test.*",
+    "!src/**/*.test.*"
+  ],
   "scripts": {
-    "dev": "vite",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier ./src --write"
   },
   "dependencies": {
+    "@lexical/history": "^0.30.0",
     "@lexical/utils": "^0.30.0",
-    "@sinclair/typebox": "^0.34.33",
     "@opral/zettel-ast": "workspace:*",
     "@opral/zettel-html": "workspace:*"
   },
@@ -32,7 +42,6 @@
     "prettier": "^3.5.3",
     "lexical": "^0.30.0",
     "typescript": "~5.7.2",
-    "vite": "^6.3.0",
     "vitest": "^3.1.1"
   }
 }

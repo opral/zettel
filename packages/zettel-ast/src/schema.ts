@@ -1,164 +1,279 @@
-import { Type, type Static } from "@sinclair/typebox";
-
-const Key = Type.String({
-	description: "Unique key for this node within the document",
-	minLength: 6,
+/** Versioned identifier; schema publication is separate from package installation. */
+export const SCHEMA_URL = "https://zettel.dev/schema/1/schema.json";
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export interface Node {
+	_type: string;
+	_key: string;
+}
+export interface Link extends Node {
+	_type: "zettel_link";
+	href: string;
+	title?: string;
+}
+export interface Span extends Node {
+	_type: "zettel_span";
+	text: string;
+	marks: string[];
+}
+export interface Break extends Node {
+	_type: "zettel_break";
+	marks: string[];
+}
+export interface Image extends Node {
+	_type: "zettel_image";
+	src: string;
+	alt: string;
+	title?: string;
+	marks: string[];
+}
+export interface InlineHtml extends Node {
+	_type: "zettel_html_inline";
+	value: string;
+	marks: string[];
+}
+export interface Extension extends Node {
+	[key: string]: Json;
+}
+export type Inline = Span | Break | Image | InlineHtml | Extension;
+export interface TextBlock extends Node {
+	_type: "zettel_block";
+	style: "normal" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+	children: Inline[];
+	markDefs: Link[];
+}
+export interface ListItem extends Node {
+	_type: "zettel_list_item";
+	blocks: Block[];
+	spread: boolean;
+	checked?: boolean;
+}
+export interface List extends Node {
+	_type: "zettel_list";
+	kind: "bullet" | "number";
+	start?: number;
+	spread: boolean;
+	items: ListItem[];
+}
+export interface Quote extends Node {
+	_type: "zettel_quote";
+	blocks: Block[];
+}
+export interface Code extends Node {
+	_type: "zettel_code";
+	code: string;
+	language?: string;
+	meta?: string;
+}
+export interface Rule extends Node {
+	_type: "zettel_rule";
+}
+export interface TableCell extends Node {
+	_type: "zettel_table_cell";
+	children: Inline[];
+	markDefs: Link[];
+}
+export interface TableRow extends Node {
+	_type: "zettel_table_row";
+	cells: TableCell[];
+}
+export interface Table extends Node {
+	_type: "zettel_table";
+	align: ("left" | "right" | "center" | null)[];
+	rows: TableRow[];
+}
+export interface Html extends Node {
+	_type: "zettel_html";
+	value: string;
+}
+export type CoreInline = Span | Break | Image | InlineHtml;
+/** Core-only recursive variants. The ordinary node types remain extension-capable. */
+export interface CoreTextBlock extends Node {
+	_type: "zettel_block";
+	style: TextBlock["style"];
+	children: CoreInline[];
+	markDefs: Link[];
+}
+export interface CoreListItem extends Node {
+	_type: "zettel_list_item";
+	blocks: CoreBlock[];
+	spread: boolean;
+	checked?: boolean;
+}
+export interface CoreList extends Node {
+	_type: "zettel_list";
+	kind: "bullet" | "number";
+	start?: number;
+	spread: boolean;
+	items: CoreListItem[];
+}
+export interface CoreQuote extends Node {
+	_type: "zettel_quote";
+	blocks: CoreBlock[];
+}
+export interface CoreTableCell extends Node {
+	_type: "zettel_table_cell";
+	children: CoreInline[];
+	markDefs: Link[];
+}
+export interface CoreTableRow extends Node {
+	_type: "zettel_table_row";
+	cells: CoreTableCell[];
+}
+export interface CoreTable extends Node {
+	_type: "zettel_table";
+	align: Table["align"];
+	rows: CoreTableRow[];
+}
+export type CoreBlock = CoreTextBlock | CoreList | CoreQuote | Code | Rule | CoreTable | Html;
+/** Extension-capable block union used by Document and ordinary node types. */
+export type Block = TextBlock | List | Quote | Code | Rule | Table | Html | Extension;
+export interface Document {
+	_type: "zettel_doc";
+	blocks: Block[];
+}
+export type JsonSchema = Record<string, any>;
+const str = { type: "string" };
+const arr = (items: JsonSchema, minItems = 0): JsonSchema => ({ type: "array", items, minItems });
+const ref = (name: string): JsonSchema => ({ $ref: `#/$defs/${name}` });
+const marks = arr(str);
+const object = (properties: JsonSchema, required = Object.keys(properties)): JsonSchema => ({
+	type: "object",
+	properties,
+	required,
+	additionalProperties: false,
 });
-
-/**
- * A Base Node (modeled after [Portable Text](https://github.com/portabletext/portabletext)).
- *
- * A node always has to have a `type` and a `zettel_key`.
- */
-// Base node: must have type and zettel_key, and forbid any other 'zettel_' keys
-const ZettelNode = Type.Intersect([
-	Type.Object(
+const node = (type: string, props: JsonSchema = {}, optional: string[] = []): JsonSchema =>
+	object(
 		{
-			type: Type.String(),
-			zettel_key: Key,
+			_type: { const: type },
+			_key: { type: "string", pattern: "^[A-Za-z0-9_-]+$" },
+			...props,
 		},
-		{
-			propertyNames: Type.String({
-				pattern: "^(?!zettel_).*|^zettel_key$",
-				description: "Property names must not start with 'zettel_' except 'zettel_key'",
-			}),
-			additionalProperties: true,
-		}
-	),
-	Type.Record(Type.String({ pattern: "^(?!zettel_).*|^zettel_key$" }), Type.Unknown()),
-]);
-
-export type ZettelNode = Static<typeof ZettelNode> & { [property: string]: any };
-
-const Metadata = Type.Optional(Type.Record(Type.String(), Type.Unknown()));
-
-export type ZettelLinkMark = Static<typeof ZettelLinkMark>;
-const ZettelLinkMark = Type.Object({
-	type: Type.Literal("zettel_link"),
-	zettel_key: Key,
-	href: Type.String({
-		description: "The target URL of the link",
-	}),
-	metadata: Metadata,
-});
-
-export type ZettelBoldMark = Static<typeof ZettelBoldMark>;
-const ZettelBoldMark = Type.Object({
-	type: Type.Literal("zettel_bold"),
-	zettel_key: Key,
-});
-
-export type ZettelItalicMark = Static<typeof ZettelItalicMark>;
-const ZettelItalicMark = Type.Object({
-	type: Type.Literal("zettel_italic"),
-	zettel_key: Key,
-});
-
-// Custom marks: allow any custom type not starting with 'zettel_'
-const CustomMark = Type.Object(
-	{
-		type: Type.String({ pattern: "^(?!zettel_).*" }),
-		zettel_key: Key,
-	},
-	{
-		additionalProperties: true,
-		propertyNames: Type.String({ pattern: "^(?!zettel_).*|^zettel_key$" }),
-	}
-);
-
-export type CustomMark = Static<typeof CustomMark> & { [property: string]: any };
-
-/**
- * A span is an inline element in a Zettel document.
- *
- * Marks are decorators (e.g. bold, italic, underline) or annotations (e.g. mentions, links) applied to a span.
- *
- * **What is the difference between decorators and annotations?**
- *
- * Decorators are a simple string that needs no additional properties. Annotations are objects that need additional properties.
- * For example, a link annotation needs a URL and an account mention annotation needs an account ID, but decorators
- * like "strong" or "em" don't need any additional properties.
- *
- * @example
- *   ```json
- *   {
- *     "type": "zettel_span",
- *     "zettel_key": "uniqueKey",
- *     "marks": ["zettel_bold", "93j9jas09j2"],
- *     "text": "Hello world"
- *   }
- *   ```
- */
-export type ZettelSpan = Static<typeof ZettelSpan>;
-const ZettelSpan = Type.Object({
-	type: Type.Literal("zettel_span"),
-	zettel_key: Key,
-	marks: Type.Optional(
-		Type.Array(Type.Union([ZettelBoldMark, ZettelItalicMark, ZettelLinkMark, CustomMark]))
-	),
-	text: Type.String({ description: "The text content of this span" }),
-	metadata: Metadata,
-});
-
-/**
- * A text block.
- *
- * @example
- *   ```json
- *   [
- *     {
- *       "type": "zettel_text_block",
- *       "zettel_key": "uniqueKey",
- *       "style": "zettel_normal",
- *       "children": [
- *         {
- *           "type": "zettel_span",
- *           "zettel_key": "uniqueKey",
- *           "text": "Hello world"
- *         }
- *       ]
- *     }
- *   ]
- *   ```
- */
-export type ZettelTextBlock = Static<typeof ZettelTextBlock> & { [property: string]: any };
-const ZettelTextBlock = Type.Object({
-	type: Type.Literal("zettel_text_block"),
-	zettel_key: Key,
-	style: Type.Union([
-		Type.Literal("zettel_normal"),
-		Type.String({
-			description:
-				"The key of a custom block. Renderers that don't support this block will render it as a zettel_normal block.",
+		["_type", "_key", ...Object.keys(props).filter((k) => !optional.includes(k))]
+	);
+/** Shape schema; validateDocument additionally checks identity and references. */
+export const documentSchema: JsonSchema = {
+	$schema: "https://json-schema.org/draft/2020-12/schema",
+	$id: SCHEMA_URL,
+	title: "Zettel document",
+	description:
+		"Canonical GFM document. Node keys are document-unique; marks reference definitions local to a text block or table cell.",
+	...object({ _type: { const: "zettel_doc" }, blocks: arr(ref("block")) }),
+	$defs: {
+		link: node("zettel_link", { href: str, title: str }, ["title"]),
+		span: node("zettel_span", { text: { type: "string", minLength: 1 }, marks }),
+		break: node("zettel_break", { marks }),
+		image: node("zettel_image", { src: str, alt: str, title: str, marks }, ["title"]),
+		inlineHtml: node("zettel_html_inline", { value: str, marks }),
+		text: node("zettel_block", {
+			style: { enum: ["normal", "h1", "h2", "h3", "h4", "h5", "h6"] },
+			children: arr(ref("inline")),
+			markDefs: arr(ref("link")),
 		}),
-	]),
-	children: Type.Array(ZettelSpan, {
-		description: "Array of inline spans that make up the block content",
-	}),
-	metadata: Metadata,
-});
-
-// Custom block: any block not a text-block, with basic node props, and no extra zettel_* props
-const CustomBlock = Type.Intersect([
-	Type.Object(
-		{
-			type: Type.String({ pattern: "^(?!zettel_text_block$).*" }),
-			zettel_key: Key,
+		listItem: node(
+			"zettel_list_item",
+			{ blocks: arr(ref("block")), spread: { type: "boolean" }, checked: { type: "boolean" } },
+			["checked"]
+		),
+		list: {
+			...node(
+				"zettel_list",
+				{
+					kind: { enum: ["bullet", "number"] },
+					start: { type: "integer", minimum: 0, maximum: 999999999 },
+					spread: { type: "boolean" },
+					items: arr(ref("listItem"), 1),
+				},
+				["start"]
+			),
+			allOf: [
+				{
+					if: { properties: { kind: { const: "number" } }, required: ["kind"] },
+					then: { required: ["start"] },
+					else: { not: { required: ["start"] } },
+				},
+			],
 		},
-		{
-			propertyNames: Type.String({ pattern: "^(?!zettel_).*|^zettel_key$" }),
-			additionalProperties: true,
-		}
-	),
-	Type.Record(Type.String({ pattern: "^(?!zettel_).*|^zettel_key$" }), Type.Unknown()),
-]);
-export type CustomBlock = Static<typeof CustomBlock> & { [property: string]: any };
-
-export type ZettelDoc = Static<typeof ZettelDoc>;
-// A document is an object with type 'zettel_doc' and content array of text blocks or custom blocks
-const ZettelDoc = Type.Object({
-	type: Type.Literal("zettel_doc"),
-	content: Type.Array(Type.Union([ZettelTextBlock, CustomBlock])),
-});
-
-export const ZettelDocJsonSchema = ZettelDoc;
+		quote: node("zettel_quote", { blocks: arr(ref("block")) }),
+		code: node("zettel_code", { code: str, language: str, meta: str }, ["language", "meta"]),
+		rule: node("zettel_rule"),
+		tableCell: node("zettel_table_cell", {
+			children: arr(ref("inline")),
+			markDefs: arr(ref("link")),
+		}),
+		tableRow: node("zettel_table_row", { cells: arr(ref("tableCell"), 1) }),
+		table: node("zettel_table", {
+			align: arr({ enum: ["left", "right", "center", null] }, 1),
+			rows: arr(ref("tableRow"), 1),
+		}),
+		html: node("zettel_html", { value: str }),
+		inline: { anyOf: ["span", "break", "image", "inlineHtml", "extensionInline"].map(ref) },
+		block: {
+			anyOf: ["text", "list", "quote", "code", "rule", "table", "html", "extensionBlock"].map(ref),
+		},
+		extensionInline: { not: {} },
+		extensionBlock: { not: {} },
+	},
+};
+const descriptions: Record<string, string> = {
+	text: "Paragraph or heading; annotations are local to this block.",
+	span: "Nonempty text run. Marks are decorators or local link keys. LF is a soft break.",
+	break: "Explicit hard line break, distinct from a soft newline in text.",
+	image: "Inline image; marks allow linked images. Asset storage is outside the format.",
+	inlineHtml:
+		"Literal inline HTML source, preserved for Markdown and displayed inertly by default.",
+	link: "Shared annotation referenced by its _key from inline marks.",
+	list: "Explicit list container; numbered lists require start. spread denotes loose layout.",
+	listItem: "One item owns all its blocks. checked is present only for task items.",
+	quote: "An ordered sequence of blocks inside a quotation.",
+	code: "Literal code with optional fence language and metadata.",
+	rule: "Thematic break.",
+	table: "Rectangular GFM table; first row is header. align has one entry per column.",
+	tableRow: "One ordered row of table cells.",
+	tableCell: "Inline table content with local annotation definitions.",
+	html: "Literal HTML block source. Rendering is inert by default.",
+	extensionInline: "Application-defined inline nodes; disabled in the core schema.",
+	extensionBlock: "Application-defined blocks; disabled in the core schema.",
+};
+for (const [name, description] of Object.entries(descriptions))
+	documentSchema.$defs[name].description = description;
+documentSchema.examples = [
+	{
+		_type: "zettel_doc",
+		blocks: [
+			{
+				_type: "zettel_block",
+				_key: "p1",
+				style: "normal",
+				markDefs: [],
+				children: [{ _type: "zettel_span", _key: "s1", text: "Hello, world.", marks: [] }],
+			},
+		],
+	},
+];
+/** Replace only explicit extension slots, including recursive occurrences. */
+export function createDocumentSchema(
+	extensions: { blocks?: JsonSchema[]; inline?: JsonSchema[] } = {}
+): JsonSchema {
+	const schema = structuredClone(documentSchema);
+	for (const [slot, values] of [
+		["extensionBlock", extensions.blocks],
+		["extensionInline", extensions.inline],
+	] as const) {
+		if (values?.length)
+			schema.$defs[slot] = {
+				allOf: [
+					{
+						type: "object",
+						required: ["_type", "_key"],
+						properties: {
+							_type: { type: "string", not: { pattern: "^zettel_" } },
+							_key: { type: "string", pattern: "^[A-Za-z0-9_-]+$" },
+						},
+					},
+					{ anyOf: values },
+				],
+			};
+	}
+	return schema;
+}

@@ -391,3 +391,10 @@ packages/lix-docs/docs/.vitepress/cache
 packages/lix-docs/docs/.vitepress/dist
 
 artifact/*
+# Throwaway Lix comment demo
+examples/lix-comments/.data/
+examples/lix-comments/app.js
+examples/lix-comments/artifacts/
+
+examples/playground/artifacts/
+examples/playground/dist/

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zettel · Format playground</title>
+  </head>
+  <body>
+    <header>
+      <div class="brand">Z<span>zettel</span><small>FORMAT LAB</small></div>
+      <div class="status" id="status">Loading editor…</div>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">ONE DOCUMENT · FOUR REPRESENTATIONS</p>
+        <h1>Write it. Inspect it. Take it anywhere.</h1>
+        <p>
+          GFM, structured JSON, and an editable document—sharing one rendering
+          stylesheet.
+        </p>
+      </section>
+      <nav class="actions">
+        <button id="load-sample">Load example</button
+        ><button id="export-markdown">Editor → Markdown</button
+        ><button id="export-json">Editor → JSON</button
+        ><button id="copy-html">Copy rendered HTML</button>
+      </nav>
+      <div id="diagnostics" role="status" aria-live="polite"></div>
+      <div class="grid">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Markdown</h2>
+            <button id="import-markdown">Apply Markdown →</button>
+          </div>
+          <textarea
+            id="markdown"
+            aria-label="GFM Markdown"
+            spellcheck="false"
+          ></textarea>
+          <footer>GFM import · canonical export</footer>
+        </section>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Lexical editor</h2>
+            <span class="badge">EDITABLE</span>
+          </div>
+          <div class="editor-toolbar">
+            <button aria-label="Bold" data-format="bold"><b>B</b></button
+            ><button aria-label="Italic" data-format="italic"><i>I</i></button
+            ><button aria-label="Strikethrough" data-format="strikethrough">
+              <s>S</s></button
+            ><button aria-label="Inline code" data-format="code">
+              &lt;/&gt;</button
+            ><span>Paste formatted text to try HTML import</span>
+          </div>
+          <div
+            id="editor"
+            class="zettel"
+            contenteditable="true"
+            role="textbox"
+            aria-label="Zettel editor"
+            aria-multiline="true"
+          ></div>
+          <footer>Direct JSON binding · stable keys</footer>
+        </section>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Document JSON</h2>
+            <button id="import-json">Apply JSON →</button>
+          </div>
+          <textarea
+            id="json"
+            aria-label="Zettel JSON"
+            spellcheck="false"
+          ></textarea>
+          <footer>Versioned schema · shared mark definitions</footer>
+        </section>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>Static HTML</h2>
+            <span class="badge">SAME CSS</span>
+          </div>
+          <div id="preview"></div>
+          <details>
+            <summary>HTML source</summary>
+            <pre id="html-source"></pre>
+          </details>
+          <footer>Standalone rendering · no editor required</footer>
+        </section>
+      </div>
+      <p class="footnote">
+        Local playground. Content stays in this browser tab. Raw HTML is shown
+        as source; unsupported documents remain in the JSON pane with a
+        diagnostic.
+      </p>
+    </main>
+    <script type="module" src="/src.js"></script>
+  </body>
+</html>

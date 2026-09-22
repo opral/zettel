@@ -1,339 +1,358 @@
 import {
   $getSelection,
+  createCommand,
   $isRangeSelection,
-  $getRoot,
-  $selectAll,
   COMMAND_PRIORITY_EDITOR,
-  COMMAND_PRIORITY_LOW,
   COPY_COMMAND,
+  CONTROLLED_TEXT_INSERTION_COMMAND,
+  CUT_COMMAND,
   DELETE_CHARACTER_COMMAND,
   DELETE_WORD_COMMAND,
   FORMAT_TEXT_COMMAND,
-  KEY_DOWN_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_ENTER_COMMAND,
   LexicalEditor,
   PASTE_COMMAND,
   SELECT_ALL_COMMAND,
-  TextFormatType,
+  $getRoot,
+  $selectAll,
+  type LexicalNode,
+  type RangeSelection,
+  type TextFormatType,
 } from "lexical";
+import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { mergeRegister } from "@lexical/utils";
-import { toPlainText } from "@opral/zettel-ast";
-import { fromHtmlString, toHtmlString } from "@opral/zettel-html";
-import { ZettelTextBlockNode } from "./nodes/zettel-text-block.js";
-import { ZettelSpanNode } from "./nodes/zettel-span.js";
-import { fromLexicalState, toLexicalState } from "./lexical-state.js";
+import { copyDocumentToClipboard, pasteClipboardData } from "./clipboard.js";
+import { exportDocument } from "./lexical-state.js";
+import {
+  $createZettelBreakNode,
+  $createZettelTextBlockNode,
+  ZettelBreakNode,
+  ZettelCodeNode,
+  ZettelImageNode,
+  ZettelInlineHtmlNode,
+  ZettelListItemNode,
+  ZettelSpanNode,
+  ZettelTableCellNode,
+  ZettelTextBlockNode,
+} from "./nodes/index.js";
+import { generateKey, type Link } from "./types.js";
 
-/**
- * Registers the core functionality for the Zettel editor,
- * including keybindings, command handling, and Zettel AST conversion.
- *
- *
- * @returns A cleanup function to unregister listeners.
- */
-export function registerZettelLexicalPlugin(editor: LexicalEditor): () => void {
-  const root = editor.getRootElement();
+/** Apply, edit, or remove a link on selected prose text. */
+export const SET_ZETTEL_LINK_COMMAND = createCommand<string | null>("SET_ZETTEL_LINK_COMMAND");
 
-  root?.setAttribute("data-zettel-doc", "true");
-
-  const unregisterCommandHandlers = mergeRegister();
-
-  // Format text (bold, italic, etc)
-  (editor.registerCommand<TextFormatType>(
-    FORMAT_TEXT_COMMAND,
-    (payload) => {
-      editor.update(() => {
-        const selection = $getSelection();
-        if ($isRangeSelection(selection)) {
-          selection.formatText(payload);
-        }
-      });
-      return true;
-    },
-    COMMAND_PRIORITY_EDITOR,
-  ),
-    // Enter key: insert new block
-    editor.registerCommand<KeyboardEvent | null>(
-      KEY_ENTER_COMMAND,
-      () => {
-        const root = $getRoot();
-        const newBlock = new ZettelTextBlockNode({});
-        // @ts-expect-error - "append" is not part of the schema
-        root.append(newBlock);
-        newBlock.select();
-        return true;
-      },
-      COMMAND_PRIORITY_EDITOR,
-    ),
-    editor.registerCommand<KeyboardEvent>(
-      KEY_DOWN_COMMAND,
-      (event) => {
-        const { key, metaKey, ctrlKey, altKey } = event;
-        if ((metaKey || ctrlKey) && !altKey) {
-          if (key.toLowerCase() === "b") {
-            event.preventDefault();
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold");
-            return true;
-          }
-          if (key.toLowerCase() === "i") {
-            event.preventDefault();
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic");
-            return true;
-          }
-        }
-        if (key.length === 1 && !metaKey && !ctrlKey && !altKey) {
-          event.preventDefault();
-          editor.update(() => {
-            const selection = $getSelection();
-            if ($isRangeSelection(selection)) {
-              selection.insertText(key);
-            }
-          });
-          return true;
-        }
-        return false;
-      },
-      COMMAND_PRIORITY_LOW,
-      // @prettier-ignore
-    ));
-
-  // Copy (Zettel HTML)
-  (editor.registerCommand(
-    COPY_COMMAND,
-    (event: ClipboardEvent | null) => {
-      // 1. Get the current selection as Zettel AST
-      const state = editor.getEditorState();
-      // Use your existing function to convert Lexical state to Zettel AST
-      const zettelDoc = fromLexicalState(state.toJSON());
-      const html = toHtmlString(zettelDoc);
-      // 2. Set clipboard data
-      if (event && "clipboardData" in event && event.clipboardData) {
-        // Use ClipboardEvent clipboardData API
-        event.clipboardData.setData("text/plain", toPlainText(zettelDoc));
-        event.clipboardData.setData("text/html", html);
-        event.clipboardData.setData("text/zettel", JSON.stringify(zettelDoc));
-        event.preventDefault();
-        return true;
+export function $setZettelLink(href: string | null): boolean {
+  if (href !== null && !/^(https?:\/\/|mailto:)/i.test(href.trim())) {
+    throw new Error("Use an https://, http://, or mailto: URL.");
+  }
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection)) return false;
+  if (selection.isCollapsed()) {
+    const anchor = selection.anchor.getNode();
+    const parent = anchor.getParent();
+    if (!(anchor instanceof ZettelSpanNode) || !(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) return false;
+    const link = parent.markDefs.find(def => anchor.toZettel().marks.includes(def._key));
+    if (!link) return false;
+    // A formatted link may comprise several adjacent spans.
+    let first = anchor, last = anchor;
+    while (first.getPreviousSibling() instanceof ZettelSpanNode && (first.getPreviousSibling() as ZettelSpanNode).toZettel().marks.includes(link._key)) first = first.getPreviousSibling() as ZettelSpanNode;
+    while (last.getNextSibling() instanceof ZettelSpanNode && (last.getNextSibling() as ZettelSpanNode).toZettel().marks.includes(link._key)) last = last.getNextSibling() as ZettelSpanNode;
+    selection.setTextNodeRange(first, 0, last, last.getTextContentSize());
+  }
+  let changed = false;
+  for (const node of selection.extract()) {
+    if (!(node instanceof ZettelSpanNode)) continue;
+    const parent = node.getParent();
+    if (!(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) continue;
+    const marks = node.toZettel().marks.filter(mark => !parent.markDefs.some(def => def._key === mark));
+    if (href !== null) {
+      const url = href.trim();
+      let definition = parent.markDefs.find(def => def.href === url);
+      if (!definition) {
+        definition = { _type: "zettel_link", _key: generateKey(), href: url };
+        parent.getWritable().markDefs = [...parent.markDefs, definition];
       }
-      if (typeof window !== "undefined") {
-        const clipboard = (window.navigator as any).clipboard;
-        if (clipboard && clipboard.write) {
-          // Use Clipboard API if available
-          clipboard.write([
-            new window.ClipboardItem({
-              "text/plain": new Blob([toPlainText(zettelDoc)], {
-                type: "text/plain",
-              }),
-              "text/html": new Blob([html], { type: "text/html" }),
-              "text/zettel": new Blob([JSON.stringify(zettelDoc)], {
-                type: "text/zettel",
-              }),
-            }),
-          ]);
-          return true;
-        }
-      }
-      return false;
-    },
-    COMMAND_PRIORITY_EDITOR,
-  ),
-    // Paste (Zettel: prefer text/zettel, fallback to html, fallback to plain text)
-    editor.registerCommand(
-      PASTE_COMMAND,
-      (event: ClipboardEvent | InputEvent | null) => {
-        if (!event) return false;
-        const clipboardData = (event as ClipboardEvent).clipboardData;
-        if (!clipboardData) return false;
+      marks.push(definition._key);
+    }
+    node.setMarks(marks);
+    node.setLinkHref(href?.trim());
+    changed = true;
+  }
+  return changed;
+}
 
-        // 1. Try text/zettel (raw AST)
-        if (Array.from(clipboardData.types).includes("text/zettel")) {
-          try {
-            const astJson = clipboardData.getData("text/zettel");
-            const zettelDoc = JSON.parse(astJson);
-            const lexicalState = toLexicalState(zettelDoc);
-            editor.setEditorState(editor.parseEditorState(lexicalState));
-            return true;
-          } catch (e) {
-            console.error(e);
-            // fall through to next format
-          }
-        }
-        // 2. Try text/html (Zettel HTML)
-        if (Array.from(clipboardData.types).includes("text/html")) {
-          const html = clipboardData.getData("text/html");
-          try {
-            const zettelDoc = fromHtmlString(html);
-            const lexicalState = toLexicalState(zettelDoc);
-            editor.setEditorState(editor.parseEditorState(lexicalState));
-            return true;
-          } catch (e) {
-            console.error(e);
-            // fall through to next format
-          }
-        }
-        // 3. Fallback: text/plain (insert as new block)
-        if (Array.from(clipboardData.types).includes("text/plain")) {
-          const text = clipboardData.getData("text/plain");
-          editor.update(() => {
-            const root = $getRoot();
-            const zettelTextBlock = new ZettelTextBlockNode({});
-            const zettelSpan = new ZettelSpanNode({ text });
-            // @ts-expect-error - look into type errors
-            zettelTextBlock.append(zettelSpan);
-            // @ts-expect-error - look into type errors
-            root.append(zettelTextBlock);
-          });
-          return true;
-        }
-        return false;
-      },
-      COMMAND_PRIORITY_EDITOR,
-      // @prettier-ignore
-    ),
-    // Character Deletion
-    editor.registerCommand<boolean>(
-      DELETE_CHARACTER_COMMAND,
-      (isBackward) => {
-        const selection = $getSelection();
-        if (!$isRangeSelection(selection)) {
-          return false;
-        }
-        selection.deleteCharacter(isBackward);
-        return true;
-      },
-      COMMAND_PRIORITY_EDITOR,
-    ));
+export interface ZettelLexicalPluginOptions {
+  onPasteDiagnostics?: (diagnostics: unknown[]) => void;
+}
 
-  // Delete Word
-  editor.registerCommand<boolean>(
-    DELETE_WORD_COMMAND,
-    (isBackward) => {
+/** Register normal editor commands plus Zettel clipboard integration. */
+export function registerZettelLexicalPlugin(editor: LexicalEditor, options: ZettelLexicalPluginOptions = {}): () => void {
+  const initialRoot = editor.getRootElement() as (HTMLElement & { __zettelEditor?: LexicalEditor }) | null;
+  initialRoot?.classList.add("zettel");
+  initialRoot?.setAttribute("data-zettel-doc", "true");
+  if (initialRoot) initialRoot.__zettelEditor = editor;
+  const unregisterRoot = editor.registerRootListener((root, previous) => {
+    previous?.removeEventListener("change", onChecklistChange);
+    const currentRoot = root as (HTMLElement & { __zettelEditor?: LexicalEditor }) | null;
+    currentRoot?.classList.add("zettel");
+    currentRoot?.setAttribute("data-zettel-doc", "true");
+    if (currentRoot) currentRoot.__zettelEditor = editor;
+    currentRoot?.addEventListener("change", onChecklistChange);
+  });
+  return mergeRegister(
+    unregisterRoot,
+    editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
+    registerHistory(editor, createEmptyHistoryState(), 300),
+    // Lexical routes typing in empty blocks (and other controlled insertion
+    // cases) through this command rather than a native text-node mutation.
+    editor.registerCommand(CONTROLLED_TEXT_INSERTION_COMMAND, (eventOrText) => {
       const selection = $getSelection();
-      if (!$isRangeSelection(selection)) {
-        return false;
-      }
+      if (!$isRangeSelection(selection)) return false;
+      const text = typeof eventOrText === "string" ? eventOrText : eventOrText.data;
+      if (text === null) return false;
+      selection.insertText(text);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<TextFormatType>(FORMAT_TEXT_COMMAND, (format) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      selection.formatText(format);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(COPY_COMMAND, (event) => copyDocumentToClipboard(editor, event && "clipboardData" in event ? event as ClipboardEvent : null), COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(PASTE_COMMAND, (event) => {
+      if (!event || !("clipboardData" in event) || !event.clipboardData) return false;
+      const result = pasteClipboardData(editor, event.clipboardData);
+      if (result.diagnostics?.length) options.onPasteDiagnostics?.(result.diagnostics);
+      if (result.handled) (event as ClipboardEvent).preventDefault();
+      return result.handled;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(CUT_COMMAND, (event) => {
+      if (!event) return false;
+      const copied = copyDocumentToClipboard(editor, "clipboardData" in event ? event as ClipboardEvent : null);
+      if (!copied) return false;
+      const selection = $getSelection();
+      if ($isRangeSelection(selection)) selection.removeText();
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<KeyboardEvent>(KEY_BACKSPACE_COMMAND, (event) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      event?.preventDefault();
+      selection.deleteCharacter(true);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<KeyboardEvent>(KEY_DELETE_COMMAND, (event) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      event?.preventDefault();
+      selection.deleteCharacter(false);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(DELETE_CHARACTER_COMMAND, (isBackward) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      selection.deleteCharacter(isBackward);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(DELETE_WORD_COMMAND, (isBackward) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
       selection.deleteWord(isBackward);
       return true;
-    },
-    COMMAND_PRIORITY_EDITOR,
-  );
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand<KeyboardEvent>(KEY_ENTER_COMMAND, (event) => {
+      const current = $getSelection();
+      if (!$isRangeSelection(current)) return false;
+      let selection: RangeSelection = current;
+      // Return replaces a selected range before it creates a block or a hard
+      // break. Otherwise selected text could survive a structural edit.
+      if (!selection.isCollapsed()) {
+        selection.removeText();
+        const next = $getSelection();
+        if (!$isRangeSelection(next)) return false;
+        selection = next;
+      }
 
-  // Select All
-  editor.registerCommand(
-    SELECT_ALL_COMMAND,
-    () => {
-      $selectAll();
+      const anchor = selection.anchor.getNode();
+      const code = nearestAncestor(anchor, ZettelCodeNode);
+      if (code) {
+        // Keep code line breaks as Lexical LineBreakNodes. Chromium treats a
+        // terminal literal newline in a contenteditable text node as a visual
+        // line ending and inserts the next native character before it.
+        selection.insertLineBreak();
+        event?.preventDefault();
+        return true;
+      }
+
+      const textBlock = nearestAncestor(anchor, ZettelTextBlockNode);
+      if (textBlock && anchor instanceof ZettelSpanNode) {
+        if (event?.shiftKey) insertHardBreak(textBlock, anchor, selection.anchor.offset);
+        else {
+          const item = nearestAncestor(textBlock, ZettelListItemNode);
+          if (item) splitListItem(item, textBlock, anchor, selection.anchor.offset);
+          else splitTextBlock(textBlock, anchor, selection.anchor.offset);
+        }
+        event?.preventDefault();
+        return true;
+      }
+
+      // Table cells have inline children by contract. Keep Return inside the
+      // cell as an explicit hard break instead of creating a root paragraph.
+      const cell = nearestAncestor(anchor, ZettelTableCellNode);
+      if (cell && anchor instanceof ZettelSpanNode) {
+        insertHardBreak(cell, anchor, selection.anchor.offset);
+        event?.preventDefault();
+        return true;
+      }
+
+      const top = anchor.getTopLevelElement();
+      const block = $createZettelTextBlockNode({ style: "normal", markDefs: [] });
+      if (top?.getParent()) top.insertAfter(block); else $getRoot().append(block);
+      block.selectStart();
+      event?.preventDefault();
       return true;
-    },
-    COMMAND_PRIORITY_EDITOR,
+    }, COMMAND_PRIORITY_EDITOR),
+    editor.registerCommand(SELECT_ALL_COMMAND, () => { $selectAll(); return true; }, COMMAND_PRIORITY_EDITOR),
   );
-
-  // // Copy (Zettel HTML)
-  // editor.registerCommand(
-  //   COPY_COMMAND,
-  //   (event: ClipboardEvent | null) => {
-  //     // 1. Get the current selection as Zettel AST
-  //     const state = editor.getEditorState();
-  //     // Use your existing function to convert Lexical state to Zettel AST
-  //     const zettelDoc = fromLexicalState(state.toJSON());
-  //     const html = toHtmlString(zettelDoc);
-  //     // 2. Set clipboard data
-  //     if (event && "clipboardData" in event && event.clipboardData) {
-  //       // Use ClipboardEvent clipboardData API
-  //       event.clipboardData.setData("text/plain", toPlainText(zettelDoc));
-  //       event.clipboardData.setData("text/html", html);
-  //       event.clipboardData.setData("text/zettel", JSON.stringify(zettelDoc));
-  //       event.preventDefault();
-  //       return true;
-  //     }
-  //     if (typeof window !== "undefined") {
-  //       const clipboard = (window.navigator as any).clipboard;
-  //       if (clipboard && clipboard.write) {
-  //         // Use Clipboard API if available
-  //         clipboard.write([
-  //           new window.ClipboardItem({
-  //             "text/plain": new Blob([toPlainText(zettelDoc)], {
-  //               type: "text/plain",
-  //             }),
-  //             "text/html": new Blob([html], { type: "text/html" }),
-  //             "text/zettel": new Blob([JSON.stringify(zettelDoc)], {
-  //               type: "text/zettel",
-  //             }),
-  //           }),
-  //         ]);
-  //         return true;
-  //       }
-  //     }
-  //     return false;
-  //   },
-  //   COMMAND_PRIORITY_EDITOR,
-  // ),
-  // // Paste (Zettel: prefer text/zettel, fallback to html, fallback to plain text)
-  // editor.registerCommand(
-  //   PASTE_COMMAND,
-  //   (event: ClipboardEvent | InputEvent | null) => {
-  //     if (!event) return false;
-  //     const clipboardData = (event as ClipboardEvent).clipboardData;
-  //     if (!clipboardData) return false;
-
-  //     // 1. Try text/zettel (raw AST)
-  //     if (Array.from(clipboardData.types).includes("text/zettel")) {
-  //       try {
-  //         const astJson = clipboardData.getData("text/zettel");
-  //         const zettelDoc = JSON.parse(astJson);
-  //         const lexicalState = toLexicalState(zettelDoc);
-  //         editor.setEditorState(editor.parseEditorState(lexicalState));
-  //         return true;
-  //       } catch (e) {
-  //         console.error(e);
-  //         // fall through to next format
-  //       }
-  //     }
-  //     // 2. Try text/html (Zettel HTML)
-  //     if (Array.from(clipboardData.types).includes("text/html")) {
-  //       const html = clipboardData.getData("text/html");
-  //       try {
-  //         const zettelDoc = fromHtmlString(html);
-  //         const lexicalState = toLexicalState(zettelDoc);
-  //         editor.setEditorState(editor.parseEditorState(lexicalState));
-  //         return true;
-  //       } catch (e) {
-  //         console.error(e);
-  //         // fall through to next format
-  //       }
-  //     }
-  //     // 3. Fallback: text/plain (insert as new block)
-  //     if (Array.from(clipboardData.types).includes("text/plain")) {
-  //       const text = clipboardData.getData("text/plain");
-  //       editor.update(() => {
-  //         const root = $getRoot();
-  //         const zettelTextBlock = $createZettelTextBlockNode();
-  //         const zettelSpan = $createZettelSpanNode(text);
-  //         zettelTextBlock.append(zettelSpan);
-  //         root.append(zettelTextBlock);
-  //       });
-  //       return true;
-  //     }
-  //     return false;
-  //   },
-  //   COMMAND_PRIORITY_EDITOR,
-  //   // @prettier-ignore
-  // ),
-
-  // // Cut (delegates to Copy + Delete)
-  // editor.registerCommand<ClipboardEvent>(
-  //   CUT_COMMAND,
-  //   () => {
-  //     const selection = $getSelection();
-  //     if (!$isRangeSelection(selection)) {
-  //       return false;
-  //     }
-
-  //     editor.dispatchCommand(DELETE_CHARACTER_COMMAND, false);
-  //     return true;
-  //   },
-  //   COMMAND_PRIORITY_EDITOR,
-  // ),
-
-  // Return a function that unregisters all listeners
-  return unregisterCommandHandlers;
 }
+
+function onChecklistChange(event: Event): void {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") return;
+  const key = target.closest<HTMLElement>("[data-zettel-key]")?.dataset.zettelKey;
+  if (!key) return;
+  const editor = (target.closest("[contenteditable]") as HTMLElement & { __zettelEditor?: LexicalEditor })?.__zettelEditor;
+  if (editor) setZettelListItemChecked(editor, key, target.checked);
+}
+
+function nearestAncestor<T extends LexicalNode>(node: LexicalNode, ctor: new (...args: any[]) => T): T | undefined {
+  let current: LexicalNode | null = node;
+  while (current) {
+    if (current instanceof ctor) return current;
+    current = current.getParent();
+  }
+  return undefined;
+}
+
+function linkHrefFor(block: ZettelTextBlockNode | ZettelTableCellNode, marks: string[]): string | undefined {
+  return marks.map((mark) => block.markDefs.find((definition) => definition._key === mark)?.href).find(Boolean);
+}
+
+function newSpanWithMarks(marks: string[], text: string, block: ZettelTextBlockNode | ZettelTableCellNode): ZettelSpanNode {
+  const result = new ZettelSpanNode({ _type: "zettel_span", _key: generateKey(), text, marks });
+  result.setLinkHref(linkHrefFor(block, result.toZettel().marks));
+  return result;
+}
+
+function cloneMarkDefs(markDefs: Link[]): { markDefs: Link[]; marks: Map<string, string> } {
+  const marks = new Map<string, string>();
+  const cloned = markDefs.map((definition) => {
+    const _key = generateKey();
+    marks.set(definition._key, _key);
+    return { ...definition, _key };
+  });
+  return { markDefs: cloned, marks };
+}
+
+function remapInlineMarks(node: LexicalNode, marks: Map<string, string>): void {
+  const source = node instanceof ZettelSpanNode || node instanceof ZettelImageNode || node instanceof ZettelInlineHtmlNode || node instanceof ZettelBreakNode
+    ? node.toZettel()
+    : undefined;
+  if (!source || !("marks" in source)) return;
+  const remapped = source.marks.map((mark) => marks.get(mark) ?? mark);
+  if (node instanceof ZettelSpanNode) node.setMarks(remapped);
+  else if (node instanceof ZettelImageNode || node instanceof ZettelInlineHtmlNode || node instanceof ZettelBreakNode) {
+    const writable = node.getWritable() as typeof node;
+    writable.marks = remapped;
+  }
+}
+
+function splitTextBlock(block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): void {
+  const trailing = splitBlockContent(block, anchor, offset);
+  block.insertAfter(trailing);
+  trailing.selectStart();
+}
+
+function splitBlockContent(block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): ZettelTextBlockNode {
+  const cloned = cloneMarkDefs(block.markDefs);
+  const trailing = $createZettelTextBlockNode({ style: block.style, markDefs: cloned.markDefs });
+  const siblings = block.getChildren();
+  const index = siblings.indexOf(anchor);
+  const source = anchor.getTextContent();
+  const marks = anchor.toZettel().marks;
+  const left = source.slice(0, offset);
+  const right = source.slice(offset);
+  const rightNodes = siblings.slice(index + 1);
+  if (left) anchor.setTextContent(left); else anchor.remove();
+  if (right) rightNodes.unshift(newSpanWithMarks(marks.map((mark) => cloned.marks.get(mark) ?? mark), right, trailing));
+  for (const node of rightNodes) {
+    node.remove();
+    remapInlineMarks(node, cloned.marks);
+    trailing.append(node);
+  }
+  return trailing;
+}
+
+function splitListItem(item: ZettelListItemNode, block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): void {
+  const trailing = splitBlockContent(block, anchor, offset);
+  const itemBlocks = item.getChildren();
+  const blockIndex = itemBlocks.indexOf(block);
+  const followingBlocks = itemBlocks.slice(blockIndex + 1);
+  const nextItem = new ZettelListItemNode({
+    _type: "zettel_list_item",
+    _key: generateKey(),
+    spread: item.spread,
+    ...(item.checked === undefined ? {} : { checked: false }),
+  });
+  // A newly created task item is unchecked. Preserve the existing item's
+  // remaining blocks and paragraph structure after the split point.
+  nextItem.append(trailing);
+  for (const following of followingBlocks) { following.remove(); nextItem.append(following); }
+  item.insertAfter(nextItem);
+  nextItem.selectStart();
+}
+
+function insertHardBreak(parent: ZettelTextBlockNode | ZettelTableCellNode, anchor: ZettelSpanNode, offset: number): void {
+  const source = anchor.getTextContent();
+  const marks = anchor.toZettel().marks;
+  const left = source.slice(0, offset);
+  const right = source.slice(offset);
+  const before = anchor.getPreviousSibling();
+  const after = anchor.getNextSibling();
+  if (left) anchor.setTextContent(left); else anchor.remove();
+  const breakNode = $createZettelBreakNode({});
+  const cursor = left ? anchor : before;
+  if (cursor) cursor.insertAfter(breakNode);
+  else if (after) after.insertBefore(breakNode);
+  else parent.append(breakNode);
+  if (right) {
+    const rightNode = newSpanWithMarks(marks, right, parent);
+    breakNode.insertAfter(rightNode);
+    rightNode.select(0, 0);
+  } else {
+    parent.selectEnd();
+  }
+}
+
+/** Set checklist state by the stable Zettel key (also used by the DOM change listener). */
+export function setZettelListItemChecked(editor: LexicalEditor, zettelKey: string, checked?: boolean): boolean {
+  let changed = false;
+  editor.update(() => {
+    const visit = (node: any): void => {
+      if (node instanceof ZettelListItemNode && node._key === zettelKey) {
+        const writable = node.getWritable() as ZettelListItemNode;
+        writable.checked = checked ?? !Boolean(writable.checked);
+        changed = true;
+        return;
+      }
+      if (node.getChildren) for (const child of node.getChildren()) visit(child);
+    };
+    visit($getRoot());
+  }, { discrete: true });
+  return changed;
+}
+
+/** Small convenience for vanilla apps that need a serializable snapshot. */
+export function getZettelDocument(editor: LexicalEditor) { return exportDocument(editor); }

@@ -3,13 +3,17 @@
   "name": "zettel-monorepo",
   "type": "module",
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/**\" --if-present build",
+    "build": "node scripts/clean-dist.mjs && pnpm -r --filter \"./packages/**\" --if-present build && node scripts/export-v1-schema.mjs",
     "test": "pnpm -r --filter \"./packages/**\" --if-present test",
     "lint": "pnpm -r --filter \"./packages/**\" --if-present lint",
     "format": "pnpm -r --filter \"./packages/**\" --if-present format",
     "clean": "pnpm -r --filter \"./packages/**\" --if-present clean && rm -rf ./.env ./node_modules",
     "----- CI ---- used to test the codebase on every commit": "",
-    "ci": "pnpm lint && pnpm build && pnpm test"
+    "ci": "pnpm lint && pnpm build && pnpm test",
+    "build:demo": "pnpm build && pnpm --filter zettel-playground build",
+    "demo": "pnpm build && pnpm --filter zettel-playground dev",
+    "test:demo": "pnpm build && pnpm --filter zettel-playground test",
+    "schema:v1": "pnpm --filter @opral/zettel-ast build && node scripts/export-v1-schema.mjs"
   },
   "packageManager": "pnpm@10.23.0",
   "engines": {

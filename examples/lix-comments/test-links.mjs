@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { chromium } from '@playwright/test';
+import { startServer } from './server.mjs';
+const app = await startServer({port:0,persist:false});
+const browser = await chromium.launch({headless:true,...(process.env.BROWSER_BIN ? {executablePath:process.env.BROWSER_BIN} : {})});
+try {
+ const page=await browser.newPage(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(app.url); await page.locator('[data-target="checkpoint"]').waitFor();
+ await page.locator('#editor').click();await page.keyboard.type('hello world');await page.keyboard.press('Home');
+ for(let i=0;i<5;i++) await page.keyboard.press('Shift+ArrowRight');
+ await page.locator('#link').click();await page.locator('#link-url').fill('javascript:alert(1)');await page.getByText('Apply link',{exact:true}).click();
+ assert.match(await page.locator('#link-error').textContent(),/https/);
+ await page.locator('#link-url').fill('https://example.com');await page.getByText('Apply link',{exact:true}).click();
+ assert.equal(await page.locator('#editor a').textContent(),'hello');assert.equal(await page.locator('#editor a').getAttribute('href'),'https://example.com');
+ await page.locator('[data-format="bold"]').click();assert.equal(await page.locator('#editor a strong').textContent(),'hello');
+ await page.keyboard.press('ArrowLeft');await page.keyboard.press('Control+k');
+ assert.equal(await page.locator('#link-url').inputValue(),'https://example.com');
+ await page.locator('#link-url').fill('https://example.org');await page.getByText('Apply link',{exact:true}).click();
+ assert.equal(await page.locator('#editor a').getAttribute('href'),'https://example.org');
+ await page.locator('#save').click();await page.waitForFunction(()=>document.querySelector('#status').textContent==='Saved to Lix');
+ assert.equal(await page.locator('#comments a').getAttribute('href'),'https://example.org');
+ await page.reload();await page.locator('#comments button').first().click();
+ await page.locator('.composer details summary').click();await page.locator('#export-md').click();
+ assert.match(await page.locator('#markdown').inputValue(),/https:\/\/example.org/);
+ await page.locator('#editor').click();await page.keyboard.press('Home');await page.keyboard.press('ArrowRight');await page.locator('#link').click();await page.locator('#unlink').click();
+ assert.equal(await page.locator('#editor a').count(),0);assert.equal(await page.locator('#editor strong').textContent(),'hello');
+ await page.keyboard.press('Control+z');await page.waitForFunction(()=>document.querySelector('#editor a'));
+ assert.equal((await page.locator('#error').textContent()).trim(),'');assert.deepEqual(errors,[]);
+ console.log('Links: selected text, unsafe URL rejection, formatting, caret edit, save/reload, Markdown, remove and undo passed.');
+} finally {await browser.close();await app.close();}

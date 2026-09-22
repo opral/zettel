@@ -1,0 +1,22 @@
+/** Public AST types are owned by @opral/zettel-ast. */
+export type {
+	Block,
+	Break,
+	Code,
+	Document,
+	Extension,
+	Html,
+	Image,
+	Inline,
+	InlineHtml,
+	Link,
+	List,
+	ListItem,
+	Quote,
+	Rule,
+	Span,
+	Table,
+	TableCell,
+	TableRow,
+	TextBlock,
+} from "@opral/zettel-ast";
