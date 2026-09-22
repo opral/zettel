@@ -1,9 +1,7 @@
 name: publish npm packages
 
 on:
-  workflow_dispatch:
-
-  # trigger this workflow when the CI workflow is completed
+  # Publish only after the main CI run for a Changesets release merge succeeds.
   workflow_run:
     workflows: ["Continuous Integration"]
     branches: [main]
@@ -11,25 +9,45 @@ on:
       - completed
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write
 
 jobs:
   publish:
-    # Allow manual runs, otherwise require CI success on main
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout Repo
+      - name: Checkout triggering commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Check for a Changesets release merge
+        id: release
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          base_sha="$(git rev-parse "${RELEASE_SHA}^1")"
+          version_changes="$(git diff --unified=0 "${base_sha}" "${RELEASE_SHA}" -- 'packages/*/package.json' | grep -E '^[+-][[:space:]]*\"version\":' || true)"
+          deleted_changesets="$(git diff --diff-filter=D --name-only "${base_sha}" "${RELEASE_SHA}" -- .changeset)"
+
+          if [[ -n "${version_changes}" && -n "${deleted_changesets}" ]]; then
+            echo "publish=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+            echo "No Changesets release version bump found; skipping publication."
+          fi
 
       - name: Setup Pnpm
+        if: steps.release.outputs.publish == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10.23.0
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js 24
+        if: steps.release.outputs.publish == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -37,13 +55,17 @@ jobs:
           cache: "pnpm"
 
       - name: Install Dependencies
+        if: steps.release.outputs.publish == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Upgrade npm for trusted publishing
+        if: steps.release.outputs.publish == 'true'
         run: npm install -g "npm@^11.5.1"
 
       - name: Build
+        if: steps.release.outputs.publish == 'true'
         run: pnpm build
 
       - name: Publish packages
+        if: steps.release.outputs.publish == 'true'
         run: pnpm exec changeset publish
