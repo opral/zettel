@@ -130,6 +130,32 @@ try {
   checks.push(
     "Enter splits text at the caret without moving or dropping trailing content",
   );
+  await applyMarkdown("Word\n");
+  await caret("#editor p", 4);
+  const caretX = () =>
+    page.evaluate(() => {
+      const range = getSelection().getRangeAt(0);
+      return (range.getClientRects()[0] ?? range.getBoundingClientRect()).left;
+    });
+  const beforeSpace = await caretX();
+  await page.keyboard.type(" ");
+  await page.waitForTimeout(40);
+  assert.ok(
+    (await caretX()) > beforeSpace,
+    "A typed trailing space must move the caret",
+  );
+  await page.keyboard.type(" two");
+  await page.waitForTimeout(80);
+  assert.equal(
+    (await doc()).blocks[0].children.map((c) => c.text ?? "").join(""),
+    "Word  two",
+  );
+  assert.equal(
+    await page.locator("#editor p").innerText(),
+    "Word  two",
+    "Typed spaces must not collapse while editing",
+  );
+  checks.push("typed spaces stay visible while editing");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
