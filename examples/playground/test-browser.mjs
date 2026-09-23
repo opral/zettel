@@ -205,6 +205,62 @@ try {
     "underlined text renders underlined",
   );
   checks.push("Cmd+U underlines and round-trips as the underline mark");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.keyboard.type(" **bold** after *it* `code` https://example.com/x. done");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks[0].children.map((child) => [child.text, child.marks.map((mark) => (["strong", "em", "code"].includes(mark) ? mark : "link"))]),
+    [
+      ["Start ", []],
+      ["bold", ["strong"]],
+      [" after ", []],
+      ["it", ["em"]],
+      [" ", []],
+      ["code", ["code"]],
+      [" ", []],
+      ["https://example.com/x", ["link"]],
+      [". done", []],
+    ],
+    "Markdown shortcuts format typed text and typing continues unformatted",
+  );
+  assert.equal((await doc()).blocks[0].markDefs[0]?.href, "https://example.com/x");
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.waitForTimeout(80);
+  assert.equal(
+    (await doc()).blocks[0].children.map((child) => child.text).join(""),
+    "Start bold after it code https://example.com/x. ",
+    "Undo first reverts the typing after the last conversion",
+  );
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks[0].children.map((child) => child.text).join(""), "Start bold after it code https://example.com/x. ");
+  assert.deepEqual(edited.blocks[0].markDefs, [], "The next undo reverts only the autolink");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.keyboard.type(" **b**");
+  await page.waitForTimeout(80);
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks[0].children.map((child) => [child.text, child.marks]),
+    [["Start **b**", []]],
+    "Undo reverts a shortcut conversion in one step",
+  );
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("- one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) => block._type === "zettel_list" ? [block.kind, block.items.map((item) => item.blocks[0].children.map((child) => child.text).join(""))] : block.children.map((child) => child.text).join("")),
+    ["Start", ["bullet", ["one", "two"]]],
+    "- at the start of a paragraph starts a bullet list",
+  );
+  checks.push("Markdown shortcuts format, list and link typed text; undo reverts a conversion");
   for (const inputType of ["insertReplacementText", "insertFromDrop"]) {
     await applyMarkdown("Hello wrold again.\n");
     await page.locator("#editor p").evaluate((el) => {
