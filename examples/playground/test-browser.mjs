@@ -342,6 +342,36 @@ try {
   assert.equal(await page.locator("#editor strong").innerText(), "bold");
   assert.deepEqual(await page.locator("#editor p").allInnerTexts(), ["StartDocs bold", "second"]);
   checks.push("a Google Docs paste keeps its paragraphs editable");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // Google Docs carries formatting only in styles, copies an empty
+    // paragraph as <br> and ends the payload with Apple-interchange-newline.
+    dt.setData(
+      "text/html",
+      '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-2"><p dir="ltr"><span style="font-weight:700;">Bold</span><span style="font-weight:400;"> plain </span><span style="font-style:italic;">italic</span></p><br><p dir="ltr"><span style="font-weight:400;">Second</span></p></b><br class="Apple-interchange-newline">',
+    );
+    dt.setData("text/plain", "Bold plain italic\n\nSecond\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) =>
+      block.children.map((child) => [child._type === "zettel_span" ? child.text : child._type, child.marks]),
+    ),
+    [
+      [
+        ["Start", []],
+        ["Bold", ["strong"]],
+        [" plain ", []],
+        ["italic", ["em"]],
+      ],
+      [],
+      [["Second", []]],
+    ],
+  );
+  checks.push("a Google Docs paste keeps styled formatting and blank lines without bolding plain text");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {

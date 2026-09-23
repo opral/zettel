@@ -554,10 +554,87 @@ function safeParsedUrl(
 	if (safe === undefined) addDiagnostic(context, "unsafe-url", `Dropped unsafe ${kind} URL.`, path);
 	return safe;
 }
+/**
+ * Google Docs wraps every copied fragment in
+ * `<b style="font-weight:normal" id="docs-internal-guid-…">`. The wrapper
+ * is clipboard framing, not formatting.
+ */
+function isGoogleDocsWrapper(node: HtmlElement): boolean {
+	return (attr(node, "id") ?? "").startsWith("docs-internal-guid-");
+}
+/**
+ * Chromium and WebKit mark the line break that closes a copied selection
+ * with this class. It frames the clipboard payload and carries no content.
+ */
+function isInterchangeNewline(node: HtmlElement): boolean {
+	return node.tagName === "br" && hasClass(node, "Apple-interchange-newline");
+}
+function styleDeclarations(node: HtmlElement): Map<string, string> {
+	const declarations = new Map<string, string>();
+	for (const declaration of (attr(node, "style") ?? "").split(";")) {
+		const colon = declaration.indexOf(":");
+		if (colon === -1) continue;
+		const property = declaration.slice(0, colon).trim().toLowerCase();
+		const value = declaration
+			.slice(colon + 1)
+			.replace(/!\s*important\s*$/i, "")
+			.trim()
+			.toLowerCase();
+		if (property && value) declarations.set(property, value);
+	}
+	return declarations;
+}
+function setMark(marks: string[], mark: string, on: boolean): void {
+	const index = marks.indexOf(mark);
+	if (on && index === -1) marks.push(mark);
+	if (!on && index !== -1) marks.splice(index, 1);
+}
+/**
+ * Marks for an inline element's content: the inherited marks, the element's
+ * own tag (`<b>`, `<i>`, …) and then its inline style, which overrides the
+ * tag the way CSS does. Word, Google Docs and other editors put formatting
+ * only in `style` (`font-weight:700`, `font-style:italic`,
+ * `text-decoration:line-through`), and an explicit `font-weight:normal`
+ * cancels an ancestor's bold.
+ */
 function inlineMarks(node: HtmlElement, inherited: string[]): string[] {
 	const marks = [...inherited];
+	if (isGoogleDocsWrapper(node)) return marks;
 	const mark = DECORATOR_TAGS[node.tagName];
-	if (mark && !marks.includes(mark)) marks.push(mark);
+	if (mark) setMark(marks, mark, true);
+	const style = styleDeclarations(node);
+	const weight = style.get("font-weight");
+	if (weight !== undefined) {
+		const numeric = Number.parseFloat(weight);
+		if (weight === "bold" || weight === "bolder" || numeric >= 600) setMark(marks, "strong", true);
+		else if (weight === "normal" || weight === "lighter" || numeric < 600)
+			setMark(marks, "strong", false);
+	}
+	const fontStyle = style.get("font-style");
+	if (fontStyle !== undefined) {
+		if (fontStyle.startsWith("italic") || fontStyle.startsWith("oblique"))
+			setMark(marks, "em", true);
+		else if (fontStyle === "normal") setMark(marks, "em", false);
+	}
+	const decoration = style.get("text-decoration-line") ?? style.get("text-decoration");
+	if (decoration !== undefined) {
+		const lines = decoration.split(/\s+/);
+		// Decorations propagate to descendants in CSS, so `none` removes only
+		// the decoration this element's own tag (<u>, <s>, <del>) added.
+		for (const [line, decorator] of [
+			["line-through", "strike-through"],
+			["underline", "underline"],
+		] as const) {
+			if (lines.includes(line)) setMark(marks, decorator, true);
+			else if (lines.includes("none") && mark === decorator && !inherited.includes(decorator))
+				setMark(marks, decorator, false);
+		}
+	}
+	// Links render underlined, so an underline style on a link or inside one
+	// (Google Docs styles every link's span that way) is link styling.
+	const insideLink = node.tagName === "a" || marks.some((item) => !DECORATORS.includes(item));
+	if (insideLink && mark !== "underline" && !inherited.includes("underline"))
+		setMark(marks, "underline", false);
 	return marks;
 }
 function normalizeMarks(marks: string[]): string[] {
@@ -611,6 +688,7 @@ function parseInlineNodes(
 				continue;
 			}
 		}
+		if (isInterchangeNewline(node)) continue;
 		if (node.tagName === "br") {
 			result.push({
 				_type: "zettel_break",
@@ -655,7 +733,7 @@ function parseInlineNodes(
 		}
 		if (node.tagName === "a") {
 			const href = safeParsedUrl(attr(node, "href"), "link", context, currentPath);
-			let nextMarks = [...inherited];
+			let nextMarks = inlineMarks(node, inherited);
 			if (href !== undefined) {
 				const supplied = attr(node, "data-zettel-mark-key");
 				const title = attr(node, "title");
@@ -965,6 +1043,19 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 	const inlineBuffer: HtmlNode[] = [];
 	const flushInline = (): void => {
 		if (!inlineBuffer.length) return;
+		if (inlineBuffer.every((node) => isElement(node) && node.tagName === "br")) {
+			// A <br> standing between blocks is a blank line, not text holding a
+			// hard break. Google Docs copies each empty paragraph this way.
+			for (const br of inlineBuffer.splice(0))
+				blocks.push({
+					_type: "zettel_block",
+					_key: keyFor(br, context, path),
+					style: "normal",
+					children: [],
+					markDefs: [],
+				});
+			return;
+		}
 		const markDefs: Link[] = [];
 		const children = parseInlineNodes(
 			inlineBuffer.splice(0),
@@ -988,7 +1079,7 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 			if ((node.value ?? "").trim()) inlineBuffer.push(node);
 			continue;
 		}
-		if (!isElement(node) || METADATA_TAGS.has(node.tagName)) continue;
+		if (!isElement(node) || METADATA_TAGS.has(node.tagName) || isInterchangeNewline(node)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
