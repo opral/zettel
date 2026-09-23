@@ -39,3 +39,16 @@ test("supplied annotation keys cannot change another link destination or collide
 	expect(block.markDefs.map((m) => m.href)).toEqual(["/one", "/two", "/three"]);
 	expect(new Set(block.markDefs.map((m) => m._key)).size).toBe(3);
 });
+test("an inline wrapper around blocks (Google Docs' <b id=docs-internal-guid>) keeps its blocks", () => {
+	const html =
+		'<b style="font-weight:normal;" id="docs-internal-guid-1234"><p dir="ltr"><span>Normal </span><b>bold</b></p><ul><li><p>item</p></li></ul></b>';
+	const result = importHtml(html);
+	expect(validateDocument(result.document).ok).toBe(true);
+	expect(JSON.stringify(result.document)).not.toContain("zettel_html");
+	expect(result.document.blocks.map((block) => block._type)).toEqual(["zettel_block", "zettel_list"]);
+	const [paragraph] = result.document.blocks as any[];
+	expect(paragraph.children.map((child: any) => [child.text, child.marks])).toEqual([
+		["Normal ", []],
+		["bold", ["strong"]],
+	]);
+});

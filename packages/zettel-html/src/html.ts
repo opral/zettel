@@ -939,6 +939,12 @@ function parseList(node: HtmlElement, context: ParseContext, path: string): List
 	return list;
 }
 
+function containsBlocks(node: HtmlElement): boolean {
+	return (node.childNodes ?? []).some(
+		(child) => isElement(child) && (BLOCK_TAGS.has(child.tagName) || child.tagName === "li")
+	);
+}
+
 function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"): Block[] {
 	const blocks: Block[] = [];
 	const inlineBuffer: HtmlNode[] = [];
@@ -1059,6 +1065,14 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 			continue;
 		}
 		if (["div", "section", "article", "header", "footer", "main", "aside"].includes(node.tagName)) {
+			flushInline();
+			blocks.push(...parseBlocks(node.childNodes ?? [], context, currentPath));
+			continue;
+		}
+		if (INLINE_TAGS.has(node.tagName) && containsBlocks(node)) {
+			// An inline element wrapping blocks is a container, not formatting:
+			// Google Docs wraps every copied fragment in
+			// <b style="font-weight:normal" id="docs-internal-guid-…">.
 			flushInline();
 			blocks.push(...parseBlocks(node.childNodes ?? [], context, currentPath));
 			continue;
