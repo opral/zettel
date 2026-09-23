@@ -147,3 +147,54 @@ it('repairs list structure that Lexical edits can leave behind before it is comm
  }, { discrete: true });
  expect(shape(exportDocument(editor).blocks)).toEqual([{ bullet: [['one', 'stray']] }]);
 });
+
+it('Backspace at the start of a non-empty nested item outdents it first, then turns it into a paragraph', () => {
+ const editor = setup([list('list', [item('a', 'one', [list('nested', [item('n1', 'inner'), item('n2', 'inner two')])]), item('b', 'two')])]);
+ caretAtText(editor, 'inner', 0);
+ press(editor, 'Backspace');
+ // The item moves up one level with its text; the nested items after it stay nested, now under it.
+ expect(shape(exportDocument(editor).blocks)).toEqual([{ bullet: [['one'], ['inner', { bullet: [['inner two']] }], ['two']] }]);
+ expect(selectedText(editor)).toEqual(['inner', 0]);
+ press(editor, 'Backspace');
+ expect(shape(exportDocument(editor).blocks)).toEqual([{ bullet: [['one']] }, 'inner', { bullet: [['inner two']] }, { bullet: [['two']] }]);
+ expect(selectedText(editor)).toEqual(['inner', 0]);
+});
+
+it('Backspace at the start of a non-empty item works however the caret got there', () => {
+ // The caret as an element point on the item, on its text block, or after an empty span.
+ const placements: Array<[string, () => void]> = [
+  ['item', () => { (($getRoot().getFirstChildOrThrow() as any).getChildAtIndex(1)).select(0, 0); }],
+  ['block', () => { (($getRoot().getFirstChildOrThrow() as any).getChildAtIndex(1).getFirstChild()).select(0, 0); }],
+  ['after an empty span', () => {
+   const two = $getRoot().getAllTextNodes().find(node => node.getTextContent() === 'two')!;
+   two.insertBefore(new ZettelSpanNode({ text: '', marks: [] }));
+   two.select(0, 0);
+  }],
+ ];
+ for (const [name, place] of placements) {
+  const editor = setup([list('list', [item('a', 'one'), item('b', 'two'), item('c', 'three')])]);
+  editor.update(place, { discrete: true });
+  press(editor, 'Backspace');
+  expect(shape(exportDocument(editor).blocks), name).toEqual([{ bullet: [['one']] }, 'two', { bullet: [['three']] }]);
+ }
+});
+
+it('Backspace at the start of any quote line moves that line out of the quote', () => {
+ const quote = () => ({ _type: 'zettel_quote', _key: 'q', blocks: [paragraph('q1', 'first'), paragraph('q2', 'middle'), paragraph('q3', 'last')] });
+ let editor = setup([quote()]);
+ caretAtText(editor, 'middle', 0);
+ press(editor, 'Backspace');
+ expect(shape(exportDocument(editor).blocks)).toEqual([{ quote: ['first'] }, 'middle', { quote: ['last'] }]);
+ expect(selectedText(editor)).toEqual(['middle', 0]);
+
+ editor = setup([quote()]);
+ caretAtText(editor, 'last', 0);
+ press(editor, 'Backspace');
+ expect(shape(exportDocument(editor).blocks)).toEqual([{ quote: ['first', 'middle'] }, 'last']);
+ expect(selectedText(editor)).toEqual(['last', 0]);
+
+ editor = setup([quote()]);
+ caretAtText(editor, 'first', 0);
+ press(editor, 'Backspace');
+ expect(shape(exportDocument(editor).blocks)).toEqual(['first', { quote: ['middle', 'last'] }]);
+});

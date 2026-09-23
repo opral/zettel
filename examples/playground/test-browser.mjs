@@ -529,6 +529,38 @@ try {
   assert.equal(await page.locator("#editor li").count(), 0);
   checks.push("Enter and Backspace leave lists without ghost items; select all + Backspace clears them");
 
+  const shapeOf = (blocks) => blocks.map((block) =>
+    block._type === "zettel_list"
+      ? { [block.kind]: block.items.map((item) => shapeOf(item.blocks)) }
+      : block._type === "zettel_quote"
+        ? { quote: shapeOf(block.blocks) }
+        : (block.children ?? []).map((n) => n.text ?? "").join(""),
+  );
+  await applyMarkdown("- one\n  - inner\n- two\n");
+  await caret("#editor li li p", 5);
+  for (let i = 0; i < 5; i += 1) await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"], ["inner"], ["two"]] }], "Backspace at a nested item's start outdents it");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"]] }, "inner", { bullet: [["two"]] }], "a second Backspace turns it into a paragraph");
+  await page.keyboard.type("ab");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"]] }, "inner", { bullet: [["two"]] }], "Backspace inside text still deletes characters");
+  await applyMarkdown("> first\n>\n> middle\n>\n> last\n");
+  await caret("#editor blockquote p:nth-child(2)", 6);
+  for (let i = 0; i < 6; i += 1) await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ quote: ["first"] }, "middle", { quote: ["last"] }], "Backspace at a quote line's start moves the line out");
+  await page.keyboard.type("X");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ quote: ["first"] }, "Xmiddle", { quote: ["last"] }]);
+  checks.push("Backspace at the start of a non-empty nested item outdents it, and at a quote line's start moves the line out");
+
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
