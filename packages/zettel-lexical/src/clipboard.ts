@@ -191,6 +191,10 @@ function pasteInlineAtCaret(parent: ZettelTextBlockNode | ZettelTableCellNode, a
     else parent.append(rightNode);
   }
   appendMarkDefs(parent, block.markDefs ?? []);
+  // Continue typing after the pasted content, not before it.
+  const last = insertion[insertion.length - 1];
+  if (last instanceof ZettelSpanNode) last.select(last.getTextContentSize(), last.getTextContentSize());
+  else if (last) last.selectNext(0, 0);
 }
 
 /**
@@ -242,7 +246,7 @@ function pasteTextBlocksAtCaret(parent: ZettelTextBlockNode, anchor: ZettelSpanN
   if (trailing.getChildren().length) {
     blockCursor.insertAfter(trailing);
     trailing.selectStart();
-  } else if (blockCursor instanceof ZettelTextBlockNode) {
+  } else if (blockCursor instanceof ElementNode) {
     blockCursor.selectEnd();
   }
 }

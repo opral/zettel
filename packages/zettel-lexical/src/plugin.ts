@@ -7,6 +7,7 @@ import {
   CONTROLLED_TEXT_INSERTION_COMMAND,
   CUT_COMMAND,
   DELETE_CHARACTER_COMMAND,
+  DELETE_LINE_COMMAND,
   DELETE_WORD_COMMAND,
   FORMAT_TEXT_COMMAND,
   KEY_BACKSPACE_COMMAND,
@@ -95,12 +96,26 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
   if (initialRoot) initialRoot.__zettelEditor = editor;
   const unregisterRoot = editor.registerRootListener((root, previous) => {
     previous?.removeEventListener("change", onChecklistChange);
+    previous?.removeEventListener("beforeinput", onPlainTextBeforeInput, true);
     const currentRoot = root as (HTMLElement & { __zettelEditor?: LexicalEditor }) | null;
     currentRoot?.classList.add("zettel");
     currentRoot?.setAttribute("data-zettel-doc", "true");
     if (currentRoot) currentRoot.__zettelEditor = editor;
     currentRoot?.addEventListener("change", onChecklistChange);
+    currentRoot?.addEventListener("beforeinput", onPlainTextBeforeInput, true);
   });
+  function onPlainTextBeforeInput(event: Event): void {
+    const input = event as InputEvent;
+    if (event.defaultPrevented || input.inputType !== "insertText" || input.isComposing || input.data === null) return;
+    // Zettel spans are custom TextNodes. Native browser insertion after a
+    // formatting boundary can place the next character before a trailing
+    // space even when Lexical's selection is after it. Keep ordinary typing
+    // on the same controlled path as empty-block insertion. Composition stays
+    // native so IME input is not interrupted.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, input.data);
+  }
   return mergeRegister(
     unregisterRoot,
     editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
@@ -175,6 +190,14 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       selection.deleteWord(isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
+    // Cmd+Backspace / Cmd+Delete on macOS; Lexical has already prevented the
+    // browser default, so an unhandled command would swallow the key.
+    editor.registerCommand(DELETE_LINE_COMMAND, (isBackward) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      selection.deleteLine(isBackward);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<KeyboardEvent>(KEY_ENTER_COMMAND, (event) => {
       const current = $getSelection();
       if (!$isRangeSelection(current)) return false;
@@ -200,6 +223,12 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       }
 
       const textBlock = nearestAncestor(anchor, ZettelTextBlockNode);
+      if (textBlock && event?.shiftKey && !(anchor instanceof ZettelSpanNode)) {
+        // An empty block, or the caret right after a trailing break.
+        selection.insertNodes([$createZettelBreakNode({})]);
+        event.preventDefault();
+        return true;
+      }
       if (textBlock && anchor instanceof ZettelSpanNode) {
         if (event?.shiftKey) insertHardBreak(textBlock, anchor, selection.anchor.offset);
         else {
