@@ -502,6 +502,33 @@ try {
     "Enter creates a sibling list item and a real checkbox click updates task state",
   );
 
+  const listShape = (document) => document.blocks.map((block) =>
+    block._type === "zettel_list"
+      ? block.items.map((item) => item.blocks.map((b) => (b.children ?? []).map((n) => n.text ?? "").join("")).join("|"))
+      : (block.children ?? []).map((n) => n.text ?? "").join(""),
+  );
+  await applyMarkdown("- one\n- two\n");
+  await caret("#editor li:nth-child(2) p", 3);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("after");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["one", "two"], "after"], "Enter on an empty item leaves the list");
+  await caret("#editor li:nth-child(2) p", 0);
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["one"], "two", "after"], "Backspace at an item's start turns it into a paragraph");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["onetwo"], "after"], "a second Backspace joins it to the previous item");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("fresh");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), ["fresh"], "Select all and Backspace leaves a paragraph, not an empty bullet");
+  assert.equal(await page.locator("#editor li").count(), 0);
+  checks.push("Enter and Backspace leave lists without ghost items; select all + Backspace clears them");
+
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
