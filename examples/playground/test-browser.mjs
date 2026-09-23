@@ -225,6 +225,43 @@ try {
   checks.push(
     "Shift+Enter creates a hard break without splitting the paragraph",
   );
+  await applyMarkdown("Line one\n");
+  await caret("#editor p", 8);
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("four");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 1);
+  assert.deepEqual(
+    edited.blocks[0].children.map((node) => node.text ?? node._type),
+    ["Line one", "zettel_break", "two", "zettel_break", "zettel_break", "four"],
+    "Text typed after a trailing hard break must not be dropped",
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "Line one\ntwo\n\nfour");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("fresh");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.deepEqual(
+    edited.blocks.map((block) => block.children.map((node) => node.text ?? node._type)),
+    [["fresh"]],
+    "Select all and Backspace must also remove hard breaks",
+  );
+  await applyMarkdown("Ends here\n");
+  await caret("#editor p", 9);
+  const oneLine = await page.locator("#editor p").evaluate((p) => p.getBoundingClientRect().height);
+  await page.keyboard.press("Shift+Enter");
+  await page.waitForTimeout(80);
+  const twoLines = await page.locator("#editor p").evaluate((p) => p.getBoundingClientRect().height);
+  assert.ok(
+    twoLines > oneLine * 1.5,
+    `A trailing hard break must show the new, empty line (${oneLine} -> ${twoLines})`,
+  );
+  checks.push("typing after a trailing hard break keeps the text on the new line");
 
   await applyMarkdown("- [ ] First second\n- Last\n");
   await caret("#editor li p", 5);

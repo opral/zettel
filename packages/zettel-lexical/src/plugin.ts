@@ -187,6 +187,12 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       }
 
       const textBlock = nearestAncestor(anchor, ZettelTextBlockNode);
+      if (textBlock && event?.shiftKey && !(anchor instanceof ZettelSpanNode)) {
+        // An empty block, or the caret right after a trailing break.
+        selection.insertNodes([$createZettelBreakNode({})]);
+        event.preventDefault();
+        return true;
+      }
       if (textBlock && anchor instanceof ZettelSpanNode) {
         if (event?.shiftKey) insertHardBreak(textBlock, anchor, selection.anchor.offset);
         else {
