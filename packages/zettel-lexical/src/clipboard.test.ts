@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { copyDocumentToClipboard, createZettelEditor, loadDocument, parseClipboardData, type Document } from "./index.js";
+import { $getRoot, CONTROLLED_TEXT_INSERTION_COMMAND, type TextNode } from "lexical";
+import { copyDocumentToClipboard, createZettelEditor, exportDocument, loadDocument, parseClipboardData, pasteClipboardData, registerZettelLexicalPlugin, type Document } from "./index.js";
 
 const document: Document = {
   _type: "zettel_doc",
@@ -60,5 +61,28 @@ describe("Zettel clipboard", () => {
     const child = result.document?.blocks[0] && (result.document.blocks[0] as any).children[0];
     expect(child).toMatchObject({ _type: "app_chip", label: "Keep shape" });
     expect(child).not.toHaveProperty("marks");
+  });
+  it("leaves the caret after pasted inline content", () => {
+    for (const payload of [{ "text/plain": "PASTED" }, { "text/html": "<p><strong>PASTED</strong></p>" }]) {
+      const editor = createZettelEditor();
+      registerZettelLexicalPlugin(editor);
+      loadDocument(editor, { _type: "zettel_doc", blocks: [{ _type: "zettel_block", _key: "p", style: "normal", markDefs: [], children: [{ _type: "zettel_span", _key: "s", text: "Before after.", marks: [] }] }] });
+      editor.update(() => { ($getRoot().getFirstDescendant() as TextNode).select(7, 7); }, { discrete: true });
+      pasteClipboardData(editor, payload);
+      editor.update(() => { editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, "!"); }, { discrete: true });
+      const block = exportDocument(editor).blocks[0] as any;
+      expect(block.children.map((child: any) => child.text).join("")).toBe("Before PASTED!after.");
+    }
+  });
+  it("leaves the caret at the end of a pasted list", () => {
+    const editor = createZettelEditor();
+    registerZettelLexicalPlugin(editor);
+    loadDocument(editor, { _type: "zettel_doc", blocks: [{ _type: "zettel_block", _key: "p", style: "normal", markDefs: [], children: [{ _type: "zettel_span", _key: "s", text: "Before", marks: [] }] }] });
+    editor.update(() => { ($getRoot().getFirstDescendant() as TextNode).select(6, 6); }, { discrete: true });
+    pasteClipboardData(editor, { "text/html": "<p> one</p><ul><li>two</li></ul>" });
+    editor.update(() => { editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, "!"); }, { discrete: true });
+    const [paragraph, list] = exportDocument(editor).blocks as any[];
+    expect(paragraph.children.map((child: any) => child.text).join("")).toBe("Before one");
+    expect(list.items[0].blocks[0].children.map((child: any) => child.text).join("")).toBe("two!");
   });
 });

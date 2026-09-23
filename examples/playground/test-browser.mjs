@@ -168,6 +168,32 @@ try {
   checks.push(
     "rich paste inserts at selection with formatting, inert script removal and visible diagnostics",
   );
+  for (const [type, value] of [
+    ["text/plain", "PASTED"],
+    ["text/html", "<p><strong>PASTED</strong></p>"],
+  ]) {
+    await applyMarkdown("Before after.\n");
+    await caret("#editor p", 7);
+    await page.locator("#editor").evaluate(
+      (el, [type, value]) => {
+        const dt = new DataTransfer();
+        dt.setData(type, value);
+        el.dispatchEvent(
+          new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }),
+        );
+      },
+      [type, value],
+    );
+    await page.waitForTimeout(80);
+    await page.keyboard.type("!");
+    await page.waitForTimeout(80);
+    assert.equal(
+      await page.locator("#editor p").innerText(),
+      "Before PASTED!after.",
+      `Typing after a ${type} paste must continue after the pasted text`,
+    );
+  }
+  checks.push("the caret ends after pasted inline content");
   await applyMarkdown("| Left | Right |\n| :--- | ---: |\n| alpha | beta |\n");
   assert.equal(await page.locator("#editor th").count(), 2);
   assert.equal(await page.locator("#preview th").count(), 2);
