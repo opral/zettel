@@ -474,33 +474,70 @@ function $outdentListItem(item: ZettelListItemNode): boolean {
   return true;
 }
 
-/** Move the first block of a quote to before the quote. */
-function $liftFirstQuoteBlock(quote: ZettelQuoteNode): ElementNode | null {
-  const first = quote.getFirstChild();
-  if (!(first instanceof ElementNode)) return null;
-  quote.insertBefore(first);
+/**
+ * Move a block out of its quote. The first block moves before the quote, a
+ * later one after it; the blocks that followed it stay quoted after it.
+ */
+function $liftQuoteBlock(quote: ZettelQuoteNode, block: ElementNode): void {
+  if (!block.getPreviousSibling()) quote.insertBefore(block);
+  else {
+    const following = block.getNextSiblings();
+    quote.insertAfter(block);
+    if (following.length) {
+      const rest = new ZettelQuoteNode({ _type: "zettel_quote" });
+      block.insertAfter(rest);
+      rest.append(...following);
+    }
+  }
   if (quote.isEmpty()) quote.remove();
-  return first;
+}
+
+function isEmptySpan(node: LexicalNode): boolean {
+  return node instanceof ZettelSpanNode && node.getTextContentSize() === 0;
 }
 
 /**
- * Backspace at the very start of a list item or of a quote: lift the item's
- * blocks out of the list, or the quote's first block out of the quote,
- * instead of merging them into the previous block.
+ * The text block whose very start a collapsed caret is at. The caret can be
+ * a text point in the block's first non-empty span, an element point on the
+ * block, or an element point at the start of the list item or quote that
+ * holds it, depending on how the browser placed it.
+ */
+function $textBlockAtCaretStart(selection: RangeSelection): ZettelTextBlockNode | undefined {
+  if (!selection.isCollapsed()) return undefined;
+  let node: LexicalNode = selection.anchor.getNode();
+  let offset = selection.anchor.offset;
+  while ((node instanceof ZettelListItemNode || node instanceof ZettelQuoteNode) && offset === 0) {
+    const first = node.getFirstChild();
+    if (!first) return undefined;
+    node = first;
+  }
+  const block = nearestAncestor(node, ZettelTextBlockNode);
+  if (!block) return undefined;
+  if (node.is(block)) return block.getChildren().slice(0, offset).every(isEmptySpan) ? block : undefined;
+  if (offset !== 0) return undefined;
+  let child: LexicalNode = node;
+  while (!child.getParent()?.is(block)) child = child.getParentOrThrow();
+  return child.getPreviousSiblings().every(isEmptySpan) ? block : undefined;
+}
+
+/**
+ * Backspace at the very start of a list item or of a quote line, like other
+ * rich-text editors: a nested item moves up one level, a top-level item
+ * becomes a paragraph, and a quote line moves out of the quote. The text is
+ * kept, not merged into the previous block.
  */
 function $liftAtStart(selection: RangeSelection): boolean {
-  if (!selection.isCollapsed() || selection.anchor.offset !== 0) return false;
-  const block = nearestAncestor(selection.anchor.getNode(), ZettelTextBlockNode);
+  const block = $textBlockAtCaretStart(selection);
   if (!block) return false;
-  const anchor = selection.anchor.getNode();
-  if (!anchor.is(block) && !anchor.is(block.getFirstDescendant())) return false;
   const parent = block.getParent();
   if (parent instanceof ZettelListItemNode && parent.getFirstChild()?.is(block)) {
-    $liftListItem(parent)?.selectStart();
+    if (!$outdentListItem(parent)) $liftListItem(parent);
+    block.selectStart();
     return true;
   }
-  if (parent instanceof ZettelQuoteNode && parent.getFirstChild()?.is(block)) {
-    $liftFirstQuoteBlock(parent)?.selectStart();
+  if (parent instanceof ZettelQuoteNode) {
+    $liftQuoteBlock(parent, block);
+    block.selectStart();
     return true;
   }
   return false;

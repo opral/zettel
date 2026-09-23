@@ -539,6 +539,8 @@ try {
   await applyMarkdown("- one\n  - inner\n- two\n");
   await caret("#editor li li p", 5);
   for (let i = 0; i < 5; i += 1) await page.keyboard.press("ArrowLeft");
+  // Lexical reads the caret from the asynchronous selectionchange event.
+  await page.waitForTimeout(80);
   await page.keyboard.press("Backspace");
   await page.waitForTimeout(80);
   assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"], ["inner"], ["two"]] }], "Backspace at a nested item's start outdents it");
@@ -553,6 +555,8 @@ try {
   await applyMarkdown("> first\n>\n> middle\n>\n> last\n");
   await caret("#editor blockquote p:nth-child(2)", 6);
   for (let i = 0; i < 6; i += 1) await page.keyboard.press("ArrowLeft");
+  // Lexical reads the caret from the asynchronous selectionchange event.
+  await page.waitForTimeout(80);
   await page.keyboard.press("Backspace");
   await page.waitForTimeout(80);
   assert.deepEqual(shapeOf((await doc()).blocks), [{ quote: ["first"] }, "middle", { quote: ["last"] }], "Backspace at a quote line's start moves the line out");
