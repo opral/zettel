@@ -94,6 +94,31 @@ try {
       style.static,
       `Shared CSS differs for ${style.selector}`,
     );
+  const codeStyles = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.background = "var(--zettel-code-background)";
+    document.querySelector("#preview").append(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const look = (selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const s = getComputedStyle(node);
+      return { background: s.backgroundColor, fontFamily: s.fontFamily, fontSize: s.fontSize, padding: s.padding };
+    };
+    return {
+      expected,
+      editorInline: look("#editor p code"),
+      staticInline: look("#preview p code"),
+      editorBlock: look("#editor pre.zettel_code code"),
+      staticBlock: look("#preview pre.zettel_code code"),
+    };
+  });
+  assert.notEqual(codeStyles.expected, "rgba(0, 0, 0, 0)");
+  assert.equal(codeStyles.editorInline?.background, codeStyles.expected, "inline code has the code background while editing");
+  assert.deepEqual(codeStyles.editorInline, codeStyles.staticInline, "inline code looks the same while editing and when rendered");
+  for (const block of [codeStyles.editorBlock, codeStyles.staticBlock])
+    assert.equal(block?.background, "rgba(0, 0, 0, 0)", "code inside a code block is not styled as an inline chip");
   checks.push("all four representations load with nested lists and GFM table");
   await mkdir(new URL("./artifacts/", import.meta.url), { recursive: true });
   await page.screenshot({
