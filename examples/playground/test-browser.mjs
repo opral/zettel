@@ -181,6 +181,36 @@ try {
   checks.push(
     "Enter splits text at the caret without moving or dropping trailing content",
   );
+  for (const inputType of ["insertReplacementText", "insertFromDrop"]) {
+    await applyMarkdown("Hello wrold again.\n");
+    await page.locator("#editor p").evaluate((el) => {
+      el.closest("[contenteditable=true]").focus();
+      const text = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+      const range = document.createRange();
+      range.setStart(text, 6);
+      range.setEnd(text, 11);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+    await page.waitForTimeout(20);
+    // Spell-check suggestions and text drops carry their text in
+    // dataTransfer; InputEvent.data is null for both.
+    await page.locator("#editor").evaluate((el, inputType) => {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/plain", "world");
+      el.dispatchEvent(
+        new InputEvent("beforeinput", { inputType, dataTransfer, bubbles: true, cancelable: true }),
+      );
+    }, inputType);
+    await page.waitForTimeout(80);
+    assert.equal(
+      await page.locator("#editor p").innerText(),
+      "Hello world again.",
+      `${inputType} must insert the dataTransfer text`,
+    );
+  }
+  checks.push("spell-check replacements and text drops insert their text");
   for (const [inputType, offset, expected] of [
     ["deleteSoftLineBackward", 12, "world."],
     ["deleteHardLineBackward", 12, "world."],
