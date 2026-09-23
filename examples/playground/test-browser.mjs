@@ -45,6 +45,7 @@ async function caret(selector, offset) {
     .locator(selector)
     .first()
     .evaluate((el, offset) => {
+      el.closest("[contenteditable=true]").focus();
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       const text = walker.nextNode();
       const range = document.createRange();
@@ -53,8 +54,9 @@ async function caret(selector, offset) {
       const selection = getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      el.closest("[contenteditable=true]").focus();
+      document.dispatchEvent(new Event("selectionchange"));
     }, offset);
+  await page.waitForTimeout(20);
 }
 try {
   await page.goto(`http://127.0.0.1:${address.port}`);
@@ -114,6 +116,55 @@ try {
     initial.blocks[0].children[0]._key,
   );
   checks.push("typing changes content and retains existing node identities");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type("Bold");
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type(" text");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "StartBold text",
+    "Formatting boundaries must retain character order and spaces",
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "StartBold text");
+  assert.equal(
+    edited.blocks[0].children.find((child) => child.text === "Bold")?.marks.includes("strong"),
+    true,
+  );
+  await page.keyboard.press("ControlOrMeta+i");
+  await page.keyboard.type(" italic");
+  await page.keyboard.press("ControlOrMeta+i");
+  await page.keyboard.type(" plain");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "StartBold text italic plain",
+  );
+  assert.equal(
+    edited.blocks[0].children.find((child) => child.text === " italic")?.marks.includes("em"),
+    true,
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "StartBold text italic plain");
+  checks.push("typing across bold boundaries keeps text order and spaces");
+  await applyMarkdown("[Link](https://example.com)\n");
+  await caret("#editor a", 4);
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type("Bold");
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type(" text");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "LinkBold text",
+  );
+  assert.equal(edited.blocks[0].markDefs[0].href, "https://example.com");
+  checks.push("typing after a formatted link retains order and the link definition");
+  await applyMarkdown("Hello brave world.\n");
   await caret("#editor p", 5);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(80);
