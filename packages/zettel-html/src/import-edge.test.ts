@@ -52,3 +52,15 @@ test("an inline wrapper around blocks (Google Docs' <b id=docs-internal-guid>) k
 		["bold", ["strong"]],
 	]);
 });
+test("clipboard metadata (Chromium's leading <meta charset>) is not imported as content", () => {
+	for (const html of [
+		"<meta charset='utf-8'><p>Some <b>bold</b> text</p>",
+		"<meta charset='utf-8'><span>Inline</span> copy",
+		"<html><head><title>Page</title><link rel=\"stylesheet\" href=\"x.css\"></head><body><!--StartFragment--><p>Body</p><!--EndFragment--></body></html>",
+	]) {
+		const result = importHtml(html);
+		expect(validateDocument(result.document).ok).toBe(true);
+		expect(result.document.blocks.map((block) => block._type)).toEqual(["zettel_block"]);
+		expect(JSON.stringify(result.document)).not.toMatch(/meta|charset|Page|stylesheet/);
+	}
+});

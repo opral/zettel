@@ -66,6 +66,12 @@ const BLOCK_TAGS = new Set([
 	"main",
 	"aside",
 ]);
+/**
+ * Document metadata, not content. Clipboard HTML carries it: Chromium puts
+ * `<meta charset="utf-8">` before every copied fragment, and some apps copy
+ * a whole document with its `<head>`.
+ */
+const METADATA_TAGS = new Set(["meta", "link", "base", "title"]);
 const INLINE_TAGS = new Set([
 	"span",
 	"strong",
@@ -575,6 +581,7 @@ function parseInlineNodes(
 			continue;
 		}
 		if (node.nodeName === "#comment" || !isElement(node)) continue;
+		if (METADATA_TAGS.has(node.tagName)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
@@ -973,7 +980,7 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 			if ((node.value ?? "").trim()) inlineBuffer.push(node);
 			continue;
 		}
-		if (!isElement(node)) continue;
+		if (!isElement(node) || METADATA_TAGS.has(node.tagName)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
