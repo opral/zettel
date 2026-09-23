@@ -168,6 +168,19 @@ try {
   checks.push(
     "rich paste inserts at selection with formatting, inert script removal and visible diagnostics",
   );
+  await applyMarkdown("Before after.\n");
+  await caret("#editor p", 7);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // What Chromium puts on the clipboard when copying from a web page.
+    dt.setData("text/html", "<meta charset='utf-8'><p>From <b>the web</b></p>");
+    dt.setData("text/plain", "From the web");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator("#editor .zettel_html").count(), 0);
+  assert.ok(!(await page.locator("#editor").innerText()).includes("charset"));
+  checks.push("clipboard <meta charset> is not pasted as a raw HTML block");
   await applyMarkdown("| Left | Right |\n| :--- | ---: |\n| alpha | beta |\n");
   assert.equal(await page.locator("#editor th").count(), 2);
   assert.equal(await page.locator("#preview th").count(), 2);
