@@ -14,6 +14,7 @@ import {
   KEY_ENTER_COMMAND,
   LexicalEditor,
   PASTE_COMMAND,
+  REMOVE_TEXT_COMMAND,
   SELECT_ALL_COMMAND,
   $getRoot,
   $selectAll,
@@ -109,7 +110,11 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(CONTROLLED_TEXT_INSERTION_COMMAND, (eventOrText) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      const text = typeof eventOrText === "string" ? eventOrText : eventOrText.data;
+      // Spell-check replacements (insertReplacementText) and text drops
+      // (insertFromDrop) carry their text in dataTransfer, not in data.
+      const text = typeof eventOrText === "string"
+        ? eventOrText
+        : eventOrText.data ?? eventOrText.dataTransfer?.getData("text/plain") ?? null;
       if (text === null) return false;
       selection.insertText(text);
       return true;
@@ -127,6 +132,14 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       if (result.diagnostics?.length) options.onPasteDiagnostics?.(result.diagnostics);
       if (result.handled) (event as ClipboardEvent).preventDefault();
       return result.handled;
+    }, COMMAND_PRIORITY_EDITOR),
+    // The source side of a drag-and-drop move (deleteByDrag) and of
+    // deleteByCut; Lexical has already prevented the browser default.
+    editor.registerCommand(REMOVE_TEXT_COMMAND, () => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      selection.removeText();
+      return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(CUT_COMMAND, (event) => {
       if (!event) return false;
