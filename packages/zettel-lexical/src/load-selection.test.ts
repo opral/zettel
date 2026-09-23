@@ -33,3 +33,22 @@ it('typing after loadDocument replaced the document under the caret stays in a Z
   expect(errors).toEqual([]);
  } finally { unregister(); editor.setRootElement(null); element.remove(); }
 });
+
+it('typing into a document with no blocks creates a Zettel block', () => {
+ const errors: Error[] = [];
+ const editor = createZettelEditor({ onError: error => errors.push(error) });
+ const element = document.createElement('div');
+ document.body.append(element);
+ editor.setRootElement(element);
+ const unregister = registerZettelLexicalPlugin(editor);
+ try {
+  loadDocument(editor, empty('first'));
+  editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); }, { discrete: true });
+  loadDocument(editor, { _type: 'zettel_doc', blocks: [] });
+  editor.update(() => { $getRoot().select(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'next'); }, { discrete: true });
+  const types = editor.getEditorState().read(() => $getRoot().getChildren().map(node => node.getType()));
+  expect(types).toEqual([ZettelTextBlockNode.getType()]);
+  expect((exportDocument(editor).blocks[0] as any).children.map((child: any) => child.text)).toEqual(['next']);
+  expect(errors).toEqual([]);
+ } finally { unregister(); editor.setRootElement(null); element.remove(); }
+});
