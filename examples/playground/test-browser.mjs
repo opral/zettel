@@ -301,6 +301,23 @@ try {
   checks.push(
     "rich paste inserts at selection with formatting, inert script removal and visible diagnostics",
   );
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // The shape of a Google Docs copy.
+    dt.setData(
+      "text/html",
+      '<b style="font-weight:normal;" id="docs-internal-guid-1"><p dir="ltr"><span>Docs </span><b>bold</b></p><p dir="ltr"><span>second</span></p></b>',
+    );
+    dt.setData("text/plain", "Docs bold\nsecond");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator("#editor .zettel_html_inline").count(), 0);
+  assert.equal(await page.locator("#editor strong").innerText(), "bold");
+  assert.deepEqual(await page.locator("#editor p").allInnerTexts(), ["StartDocs bold", "second"]);
+  checks.push("a Google Docs paste keeps its paragraphs editable");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
