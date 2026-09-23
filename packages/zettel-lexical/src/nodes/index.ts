@@ -6,6 +6,7 @@ import {
   IS_ITALIC,
   IS_STRIKETHROUGH,
   LexicalNode,
+  LineBreakNode,
   TextNode,
   type DOMExportOutput,
   type EditorConfig,
@@ -294,18 +295,23 @@ export class ZettelTextBlockNode extends ZettelElementNode {
   }
 }
 
-export class ZettelBreakNode extends ZettelElementNode {
+/**
+ * A hard break is a Lexical LineBreakNode, not an empty inline element: the
+ * caret can never be placed inside it, and Lexical renders the extra <br> a
+ * block needs to show an empty line after a trailing break.
+ */
+export class ZettelBreakNode extends LineBreakNode {
   readonly _key: string;
   marks: string[];
   constructor(data: Partial<Break>, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.marks = [...(data.marks ?? [])]; }
   static getType(): string { return "zettel_break"; }
   static clone(node: ZettelBreakNode): ZettelBreakNode { return new ZettelBreakNode({ _key: node._key, marks: node.marks }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelBreakNode { return new ZettelBreakNode(node as unknown as Break); }
-  override isInline(): boolean { return true; }
+  static importDOM(): null { return null; }
   toZettel(): Break { return { _type: "zettel_break", _key: this._key, marks: [...this.marks] }; }
   override exportJSON(): any { return jsonFor(this, this.toZettel() as unknown as Record<string, unknown>); }
-  override createDOM(_config: EditorConfig): HTMLElement { return element("br", "zettel_break", this._key); }
-  override exportDOM(_editor: LexicalEditor): DOMExportOutput { return { element: this.createDOM({} as EditorConfig) }; }
+  override createDOM(): HTMLElement { return element("br", "zettel_break", this._key); }
+  override exportDOM(_editor: LexicalEditor): DOMExportOutput { return { element: this.createDOM() }; }
 }
 
 export class ZettelImageNode extends ZettelElementNode {
