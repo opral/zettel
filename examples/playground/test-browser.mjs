@@ -45,6 +45,7 @@ async function caret(selector, offset) {
     .locator(selector)
     .first()
     .evaluate((el, offset) => {
+      el.closest("[contenteditable=true]").focus();
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       const text = walker.nextNode();
       const range = document.createRange();
@@ -53,8 +54,9 @@ async function caret(selector, offset) {
       const selection = getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      el.closest("[contenteditable=true]").focus();
+      document.dispatchEvent(new Event("selectionchange"));
     }, offset);
+  await page.waitForTimeout(20);
 }
 try {
   await page.goto(`http://127.0.0.1:${address.port}`);
@@ -114,6 +116,55 @@ try {
     initial.blocks[0].children[0]._key,
   );
   checks.push("typing changes content and retains existing node identities");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type("Bold");
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type(" text");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "StartBold text",
+    "Formatting boundaries must retain character order and spaces",
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "StartBold text");
+  assert.equal(
+    edited.blocks[0].children.find((child) => child.text === "Bold")?.marks.includes("strong"),
+    true,
+  );
+  await page.keyboard.press("ControlOrMeta+i");
+  await page.keyboard.type(" italic");
+  await page.keyboard.press("ControlOrMeta+i");
+  await page.keyboard.type(" plain");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "StartBold text italic plain",
+  );
+  assert.equal(
+    edited.blocks[0].children.find((child) => child.text === " italic")?.marks.includes("em"),
+    true,
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "StartBold text italic plain");
+  checks.push("typing across bold boundaries keeps text order and spaces");
+  await applyMarkdown("[Link](https://example.com)\n");
+  await caret("#editor a", 4);
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type("Bold");
+  await page.keyboard.press("ControlOrMeta+b");
+  await page.keyboard.type(" text");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(
+    edited.blocks[0].children.map((child) => child.text ?? "").join(""),
+    "LinkBold text",
+  );
+  assert.equal(edited.blocks[0].markDefs[0].href, "https://example.com");
+  checks.push("typing after a formatted link retains order and the link definition");
+  await applyMarkdown("Hello brave world.\n");
   await caret("#editor p", 5);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(80);
@@ -251,6 +302,43 @@ try {
   checks.push(
     "Shift+Enter creates a hard break without splitting the paragraph",
   );
+  await applyMarkdown("Line one\n");
+  await caret("#editor p", 8);
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("four");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.equal(edited.blocks.length, 1);
+  assert.deepEqual(
+    edited.blocks[0].children.map((node) => node.text ?? node._type),
+    ["Line one", "zettel_break", "two", "zettel_break", "zettel_break", "four"],
+    "Text typed after a trailing hard break must not be dropped",
+  );
+  assert.equal(await page.locator("#editor p").innerText(), "Line one\ntwo\n\nfour");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("fresh");
+  await page.waitForTimeout(80);
+  edited = await doc();
+  assert.deepEqual(
+    edited.blocks.map((block) => block.children.map((node) => node.text ?? node._type)),
+    [["fresh"]],
+    "Select all and Backspace must also remove hard breaks",
+  );
+  await applyMarkdown("Ends here\n");
+  await caret("#editor p", 9);
+  const oneLine = await page.locator("#editor p").evaluate((p) => p.getBoundingClientRect().height);
+  await page.keyboard.press("Shift+Enter");
+  await page.waitForTimeout(80);
+  const twoLines = await page.locator("#editor p").evaluate((p) => p.getBoundingClientRect().height);
+  assert.ok(
+    twoLines > oneLine * 1.5,
+    `A trailing hard break must show the new, empty line (${oneLine} -> ${twoLines})`,
+  );
+  checks.push("typing after a trailing hard break keeps the text on the new line");
 
   await applyMarkdown("- [ ] First second\n- Last\n");
   await caret("#editor li p", 5);

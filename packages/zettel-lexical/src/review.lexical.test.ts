@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { $getRoot, $getSelection, $isRangeSelection, KEY_ENTER_COMMAND } from "lexical";
+import { $getRoot, $getSelection, $isRangeSelection, CONTROLLED_TEXT_INSERTION_COMMAND, KEY_ENTER_COMMAND } from "lexical";
 import {
   copyDocumentToClipboard,
   createDocument,
@@ -49,6 +49,22 @@ describe("Lexical editing and clipboard edge cases", () => {
     expect(second.dispatchCommand(KEY_ENTER_COMMAND, { shiftKey: true, preventDefault() {} } as KeyboardEvent)).toBe(true);
     await tick();
     expect((exportDocument(second).blocks[0] as any).children.map((child: any) => child._type)).toEqual(["zettel_span", "zettel_break", "zettel_span"]);
+  });
+
+  it("keeps text typed after a trailing Shift+Return break", async () => {
+    const editor = setup(createDocument([paragraph("p", [span("s", "one")])]));
+    selectAt(editor, "one", 3);
+    const shift = { shiftKey: true, preventDefault() {} } as KeyboardEvent;
+    editor.dispatchCommand(KEY_ENTER_COMMAND, shift);
+    editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, "two");
+    editor.dispatchCommand(KEY_ENTER_COMMAND, shift);
+    editor.dispatchCommand(KEY_ENTER_COMMAND, shift);
+    editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, "four");
+    await tick();
+    const blocks = exportDocument(editor).blocks as any[];
+    expect(blocks.map((block) => block.children.map((child: any) => child.text ?? child._type))).toEqual([
+      ["one", "zettel_break", "two", "zettel_break", "zettel_break", "four"],
+    ]);
   });
 
   it("keeps Enter in code as a code newline", async () => {
