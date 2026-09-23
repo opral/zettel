@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { $getRoot, CONTROLLED_TEXT_INSERTION_COMMAND, FORMAT_TEXT_COMMAND, UNDO_COMMAND, REDO_COMMAND, TextNode } from 'lexical';
+import { $getRoot, CONTROLLED_TEXT_INSERTION_COMMAND, FORMAT_TEXT_COMMAND, REMOVE_TEXT_COMMAND, UNDO_COMMAND, REDO_COMMAND, TextNode } from 'lexical';
 import { createZettelEditor, registerZettelLexicalPlugin, loadDocument, exportDocument } from './index.js';
 function setup(link = false) {
  const editor = createZettelEditor();
@@ -56,6 +56,24 @@ it('undoes the first edit after load and never restores a previous document', ()
  loadDocument(editor, { _type: 'zettel_doc', blocks: [{ _type: 'zettel_block', _key: 'new', style: 'normal', markDefs: [], children: [] }] });
  editor.update(() => { editor.dispatchCommand(UNDO_COMMAND, undefined); }, { discrete: true });
  expect(exportDocument(editor).blocks[0]._key).toBe('new');
+});
+
+it('inserts spell-check replacements and drops, whose text is in dataTransfer', () => {
+ const editor = setup(true);
+ editor.update(() => { (($getRoot().getFirstChildOrThrow() as any).getFirstChild() as TextNode).select(6, 11); }, { discrete: true });
+ const replacement = { inputType: 'insertReplacementText', data: null, dataTransfer: { getData: (type: string) => type === 'text/plain' ? 'there' : '' } } as unknown as InputEvent;
+ let handled = false;
+ editor.update(() => { handled = editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, replacement); }, { discrete: true });
+ expect(handled).toBe(true);
+ expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => n.text).join('')).toBe('hello there');
+});
+it('removes the dragged selection (deleteByDrag)', () => {
+ const editor = setup(true);
+ editor.update(() => { (($getRoot().getFirstChildOrThrow() as any).getFirstChild() as TextNode).select(5, 11); }, { discrete: true });
+ let handled = false;
+ editor.update(() => { handled = editor.dispatchCommand(REMOVE_TEXT_COMMAND, null as any); }, { discrete: true });
+ expect(handled).toBe(true);
+ expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => n.text).join('')).toBe('hello');
 });
 it('Cmd+U underlines: it round-trips as the underline mark and toggles off', () => {
  const editor = setup();

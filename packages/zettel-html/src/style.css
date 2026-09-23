@@ -29,6 +29,16 @@
 	white-space: normal;
 }
 
+/*
+ * While editing, whitespace is content: a typed trailing space has to move
+ * the caret and repeated spaces must not collapse. With `normal`, browsers
+ * either hide the space (controlled insertion) or store U+00A0 instead of a
+ * space (native insertion).
+ */
+.zettel[contenteditable="true"] .zettel_block {
+	white-space: pre-wrap;
+}
+
 .zettel h1.zettel_block,
 .zettel h2.zettel_block,
 .zettel h3.zettel_block,

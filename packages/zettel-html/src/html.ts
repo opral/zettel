@@ -73,6 +73,12 @@ const BLOCK_TAGS = new Set([
 	"main",
 	"aside",
 ]);
+/**
+ * Document metadata, not content. Clipboard HTML carries it: Chromium puts
+ * `<meta charset="utf-8">` before every copied fragment, and some apps copy
+ * a whole document with its `<head>`.
+ */
+const METADATA_TAGS = new Set(["meta", "link", "base", "title"]);
 const INLINE_TAGS = new Set([
 	"span",
 	"strong",
@@ -583,6 +589,7 @@ function parseInlineNodes(
 			continue;
 		}
 		if (node.nodeName === "#comment" || !isElement(node)) continue;
+		if (METADATA_TAGS.has(node.tagName)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
@@ -947,6 +954,12 @@ function parseList(node: HtmlElement, context: ParseContext, path: string): List
 	return list;
 }
 
+function containsBlocks(node: HtmlElement): boolean {
+	return (node.childNodes ?? []).some(
+		(child) => isElement(child) && (BLOCK_TAGS.has(child.tagName) || child.tagName === "li")
+	);
+}
+
 function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"): Block[] {
 	const blocks: Block[] = [];
 	const inlineBuffer: HtmlNode[] = [];
@@ -975,7 +988,7 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 			if ((node.value ?? "").trim()) inlineBuffer.push(node);
 			continue;
 		}
-		if (!isElement(node)) continue;
+		if (!isElement(node) || METADATA_TAGS.has(node.tagName)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
@@ -1067,6 +1080,14 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 			continue;
 		}
 		if (["div", "section", "article", "header", "footer", "main", "aside"].includes(node.tagName)) {
+			flushInline();
+			blocks.push(...parseBlocks(node.childNodes ?? [], context, currentPath));
+			continue;
+		}
+		if (INLINE_TAGS.has(node.tagName) && containsBlocks(node)) {
+			// An inline element wrapping blocks is a container, not formatting:
+			// Google Docs wraps every copied fragment in
+			// <b style="font-weight:normal" id="docs-internal-guid-…">.
 			flushInline();
 			blocks.push(...parseBlocks(node.childNodes ?? [], context, currentPath));
 			continue;
