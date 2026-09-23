@@ -372,6 +372,30 @@ try {
     ],
   );
   checks.push("a Google Docs paste keeps styled formatting and blank lines without bolding plain text");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // The shape of a Word desktop copy: Office namespace tags, conditional
+    // comments and a list written as paragraphs with a literal bullet.
+    dt.setData(
+      "text/html",
+      `<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta name=Generator content="Microsoft Word 15"><!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]--><style><!-- p.MsoNormal {margin:0cm;} --></style></head><body lang=EN-US><!--StartFragment--><p class=MsoNormal>Hello <b>bold</b><o:p></o:p></p><p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>One<o:p></o:p></p><p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>Two<o:p></o:p></p><!--EndFragment--></body></html>`,
+    );
+    dt.setData("text/plain", "Hello bold\n·  One\n·  Two\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator("#editor .zettel_html_inline").count(), 0);
+  assert.equal(await page.locator("#editor .zettel_html").count(), 0);
+  assert.deepEqual(await page.locator("#editor li").allInnerTexts(), ["One", "Two"]);
+  assert.ok(!(await page.locator("#editor").innerText()).includes("·"));
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("typed");
+  await page.waitForTimeout(100);
+  assert.equal((await page.locator("#editor").innerText()).trim(), "typed");
+  checks.push("a Word desktop paste drops Office markup, keeps its list, and select-all + delete clears it");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
