@@ -240,3 +240,48 @@ describe("GFM export", () => {
     ).toThrow(MarkdownConversionError);
   });
 });
+
+describe("underline", () => {
+  const underlined = (text: string, marks: string[] = ["underline"]) => ({
+    _type: "zettel_doc",
+    blocks: [
+      {
+        _type: "zettel_block",
+        _key: "b",
+        style: "normal",
+        markDefs: [],
+        children: [
+          { _type: "zettel_span", _key: "s1", text: "a ", marks: [] },
+          { _type: "zettel_span", _key: "s2", text, marks },
+          { _type: "zettel_span", _key: "s3", text: " c", marks: [] },
+        ],
+      },
+    ],
+  }) as unknown as Document;
+
+  test("exports as inline <u> and imports back as the underline mark", () => {
+    const markdown = toMarkdown(underlined("b"));
+    expect(markdown.trim()).toBe("a <u>b</u> c");
+    const block = fromMarkdown(markdown).blocks[0] as TextBlock;
+    expect(block.children.map((child: any) => [child.text, child.marks])).toEqual([
+      ["a ", []],
+      ["b", ["underline"]],
+      [" c", []],
+    ]);
+  });
+
+  test("combines with other marks and reads <ins> too", () => {
+    const markdown = toMarkdown(underlined("b", ["strong", "underline"]));
+    const marks = (fromMarkdown(markdown).blocks[0] as any).children[1].marks;
+    expect([...marks].sort()).toEqual(["strong", "underline"]);
+    const ins = fromMarkdown("a <ins>b</ins> c").blocks[0] as any;
+    expect(ins.children[1].marks).toEqual(["underline"]);
+  });
+
+  test("an unpaired <u> stays inline HTML", () => {
+    const block = fromMarkdown("a <u>b c").blocks[0] as any;
+    expect(block.children.map((child: any) => child._type)).toContain(
+      "zettel_html_inline",
+    );
+  });
+});

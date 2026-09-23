@@ -40,9 +40,16 @@ const DECORATOR_TAGS: Record<string, string> = {
 	b: "strong",
 	em: "em",
 	i: "em",
+	u: "underline",
+	ins: "underline",
 	s: "strike-through",
 	del: "strike-through",
 	code: "code",
+};
+const DECORATORS = ["strong", "em", "underline", "strike-through", "code"];
+const DECORATOR_EXPORT_TAGS: Record<string, string> = {
+	underline: "u",
+	"strike-through": "del",
 };
 const BLOCK_TAGS = new Set([
 	"p",
@@ -78,6 +85,8 @@ const INLINE_TAGS = new Set([
 	"b",
 	"em",
 	"i",
+	"u",
+	"ins",
 	"s",
 	"del",
 	"code",
@@ -307,8 +316,8 @@ function renderMarks(
 ): string {
 	let result = inner;
 	for (const mark of [...marks].reverse()) {
-		if (["strong", "em", "strike-through", "code"].includes(mark)) {
-			const tag = mark === "strike-through" ? "del" : mark;
+		if (DECORATORS.includes(mark)) {
+			const tag = DECORATOR_EXPORT_TAGS[mark] ?? mark;
 			result = `<${tag}>${result}</${tag}>`;
 			continue;
 		}
@@ -552,10 +561,9 @@ function inlineMarks(node: HtmlElement, inherited: string[]): string[] {
 	return marks;
 }
 function normalizeMarks(marks: string[]): string[] {
-	const decorators = ["strong", "em", "strike-through", "code"];
 	return [
-		...marks.filter((mark) => decorators.includes(mark)),
-		...marks.filter((mark) => !decorators.includes(mark)),
+		...marks.filter((mark) => DECORATORS.includes(mark)),
+		...marks.filter((mark) => !DECORATORS.includes(mark)),
 	];
 }
 
@@ -652,7 +660,7 @@ function parseInlineNodes(
 				const supplied = attr(node, "data-zettel-mark-key");
 				const title = attr(node, "title");
 				const usableKey =
-					validKey(supplied) && !["strong", "em", "strike-through", "code"].includes(supplied);
+					validKey(supplied) && !DECORATORS.includes(supplied);
 				const existing = usableKey
 					? markDefs.find(
 							(definition) =>

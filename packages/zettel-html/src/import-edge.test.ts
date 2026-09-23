@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import { validateDocument, type Table, type List } from "@opral/zettel-ast";
-import { importHtml } from "./html.js";
+import { importHtml, toHtml } from "./html.js";
 test("ragged clipboard tables pad to widest row without losing cells", () => {
 	const result = importHtml("<table><tr><td>A</td></tr><tr><td>B</td><td>C</td></tr></table>");
 	expect(validateDocument(result.document).ok).toBe(true);
@@ -63,4 +63,20 @@ test("clipboard metadata (Chromium's leading <meta charset>) is not imported as 
 		expect(result.document.blocks.map((block) => block._type)).toEqual(["zettel_block"]);
 		expect(JSON.stringify(result.document)).not.toMatch(/meta|charset|Page|stylesheet/);
 	}
+});
+
+test("underline: <u> and <ins> import as the underline mark and export as <u>", () => {
+	for (const html of ["<p>a <u>b</u> c</p>", "<p>a <ins>b</ins> c</p>"]) {
+		const result = importHtml(html);
+		expect(validateDocument(result.document).ok).toBe(true);
+		const [block] = result.document.blocks as any[];
+		expect(block.children.map((child: any) => [child.text, child.marks])).toEqual([
+			["a ", []],
+			["b", ["underline"]],
+			[" c", []],
+		]);
+		expect(toHtml(result.document)).toContain("<u>");
+	}
+	const combined = importHtml("<p><strong><u>both</u></strong></p>").document;
+	expect((combined.blocks[0] as any).children[0].marks.sort()).toEqual(["strong", "underline"]);
 });

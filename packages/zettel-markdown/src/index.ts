@@ -464,18 +464,8 @@ function inlineFromMdast(
 } {
   const markDefs: Link[] = [];
   const definitions: MarkDefinitionMap = new Map();
-  const children: CoreInline[] = [];
-  for (const [index, node] of nodes.entries()) {
-    children.push(
-      ...inlineNodeFromMdast(
-        node,
-        [],
-        definitions,
-        `${path}.children[${index}]`,
-        references,
-      ),
-    );
-  }
+  // inlineChildren pairs <u>…</u> siblings into the underline mark.
+  const children = inlineChildren(nodes, [], definitions, path, references);
   markDefs.push(...definitions.values());
   return { children, markDefs };
 }
@@ -609,6 +599,33 @@ function inlineNodeFromMdast(
   }
 }
 
+const UNDERLINE_OPEN = /^<(u|ins)>$/i;
+const UNDERLINE_CLOSE = /^<\/(u|ins)>$/i;
+
+/**
+ * The sibling that closes an underline opened at `start`: `<u>` pairs with
+ * `</u>` and `<ins>` with `</ins>`, nested pairs counted, so `<u>` without a
+ * partner stays inline HTML.
+ */
+function underlineClose(nodes: PhrasingContent[], start: number): number {
+  const open = nodes[start];
+  if (open?.type !== "html") return -1;
+  const tag = UNDERLINE_OPEN.exec(open.value.trim())?.[1]?.toLowerCase();
+  if (!tag) return -1;
+  let depth = 0;
+  for (let index = start + 1; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    if (node?.type !== "html") continue;
+    const value = node.value.trim();
+    if (UNDERLINE_OPEN.exec(value)?.[1]?.toLowerCase() === tag) depth += 1;
+    else if (UNDERLINE_CLOSE.exec(value)?.[1]?.toLowerCase() === tag) {
+      if (depth === 0) return index;
+      depth -= 1;
+    }
+  }
+  return -1;
+}
+
 function inlineChildren(
   nodes: PhrasingContent[],
   marks: string[],
@@ -616,15 +633,33 @@ function inlineChildren(
   path: string,
   references: MarkdownReferenceMap,
 ): CoreInline[] {
-  return nodes.flatMap((child, index) =>
-    inlineNodeFromMdast(
-      child,
-      marks,
-      definitions,
-      `${path}.children[${index}]`,
-      references,
-    ),
-  );
+  const result: CoreInline[] = [];
+  for (let index = 0; index < nodes.length; index += 1) {
+    const close = underlineClose(nodes, index);
+    if (close > index) {
+      result.push(
+        ...inlineChildren(
+          nodes.slice(index + 1, close),
+          appendMark(marks, "underline"),
+          definitions,
+          `${path}.children[${index + 1}]`,
+          references,
+        ),
+      );
+      index = close;
+      continue;
+    }
+    result.push(
+      ...inlineNodeFromMdast(
+        nodes[index]!,
+        marks,
+        definitions,
+        `${path}.children[${index}]`,
+        references,
+      ),
+    );
+  }
+  return result;
 }
 
 function appendMark(marks: string[], mark: string): string[] {
@@ -778,10 +813,18 @@ function inlineToMdast(
     while (frames.length > depth) {
       const frame = frames.pop();
       if (!frame) continue;
-      const wrapped = wrapMark(frame.mark, frame.children, definitions, path);
+      const wrapped =
+        frame.mark === "underline"
+          ? // CommonMark has no underline; GFM renders inline <u>.
+            [
+              { type: "html", value: "<u>" } as PhrasingContent,
+              ...frame.children,
+              { type: "html", value: "</u>" } as PhrasingContent,
+            ]
+          : [wrapMark(frame.mark, frame.children, definitions, path)];
       const parent = frames.at(-1);
-      if (parent) parent.children.push(wrapped);
-      else output.push(wrapped);
+      if (parent) parent.children.push(...wrapped);
+      else output.push(...wrapped);
     }
   };
 

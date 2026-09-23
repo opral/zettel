@@ -181,6 +181,30 @@ try {
   checks.push(
     "Enter splits text at the caret without moving or dropping trailing content",
   );
+  await applyMarkdown("Plain\n");
+  await caret("#editor p", 5);
+  // No leading spaces: typing a space across a format boundary is
+  // opral/zettel#8's subject, not this check's.
+  await page.keyboard.press("ControlOrMeta+u");
+  await page.keyboard.type("text");
+  await page.keyboard.press("ControlOrMeta+u");
+  await page.keyboard.type("more");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks[0].children.map((child) => [child.text, child.marks]),
+    [
+      ["Plain", []],
+      ["text", ["underline"]],
+      ["more", []],
+    ],
+    "Cmd+U underlines what is typed next and toggles back off",
+  );
+  assert.equal(
+    await page.locator("#editor u, #editor [style*='underline']").count() > 0,
+    true,
+    "underlined text renders underlined",
+  );
+  checks.push("Cmd+U underlines and round-trips as the underline mark");
   for (const inputType of ["insertReplacementText", "insertFromDrop"]) {
     await applyMarkdown("Hello wrold again.\n");
     await page.locator("#editor p").evaluate((el) => {

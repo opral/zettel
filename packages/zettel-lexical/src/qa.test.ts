@@ -75,3 +75,26 @@ it('removes the dragged selection (deleteByDrag)', () => {
  expect(handled).toBe(true);
  expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => n.text).join('')).toBe('hello');
 });
+it('Cmd+U underlines: it round-trips as the underline mark and toggles off', () => {
+ const editor = setup();
+ editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'Plain '); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'text'); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, ' more'); }, { discrete: true });
+ const spans = () => (exportDocument(editor).blocks[0] as any).children.map((n: any) => [n.text, n.marks]);
+ expect(spans()).toEqual([['Plain ', []], ['text', ['underline']], [' more', []]]);
+ // It survives export and load.
+ const reloaded = setup();
+ loadDocument(reloaded, exportDocument(editor));
+ expect((exportDocument(reloaded).blocks[0] as any).children.map((n: any) => [n.text, n.marks])).toEqual(spans());
+ // Cmd+U again on the underlined text removes the mark (spans keep their
+ // own keys, as with bold).
+ editor.update(() => { (($getRoot().getFirstChildOrThrow() as any).getChildAtIndex(1) as TextNode).select(0, 4); editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'); }, { discrete: true });
+ expect(spans().map(([, marks]: any) => marks)).toEqual([[], [], []]);
+ expect(spans().map(([text]: any) => text).join('')).toBe('Plain text more');
+});
+it('ignores formats Zettel cannot store (highlight, subscript) instead of splitting spans', () => {
+ const editor = setup();
+ editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'abc'); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'highlight'); editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'subscript'); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'def'); }, { discrete: true });
+ expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => [n.text, n.marks])).toEqual([['abcdef', []]]);
+});
