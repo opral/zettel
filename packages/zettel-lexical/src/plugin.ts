@@ -7,6 +7,7 @@ import {
   CONTROLLED_TEXT_INSERTION_COMMAND,
   CUT_COMMAND,
   DELETE_CHARACTER_COMMAND,
+  DELETE_LINE_COMMAND,
   DELETE_WORD_COMMAND,
   FORMAT_TEXT_COMMAND,
   KEY_BACKSPACE_COMMAND,
@@ -174,6 +175,14 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       selection.deleteWord(isBackward);
+      return true;
+    }, COMMAND_PRIORITY_EDITOR),
+    // Cmd+Backspace / Cmd+Delete on macOS; Lexical has already prevented the
+    // browser default, so an unhandled command would swallow the key.
+    editor.registerCommand(DELETE_LINE_COMMAND, (isBackward) => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      selection.deleteLine(isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<KeyboardEvent>(KEY_ENTER_COMMAND, (event) => {

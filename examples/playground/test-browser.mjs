@@ -181,6 +181,32 @@ try {
   checks.push(
     "Enter splits text at the caret without moving or dropping trailing content",
   );
+  for (const [inputType, offset, expected] of [
+    ["deleteSoftLineBackward", 12, "world."],
+    ["deleteHardLineBackward", 12, "world."],
+    ["deleteSoftLineForward", 5, "Hello"],
+    ["deleteHardLineForward", 5, "Hello"],
+  ]) {
+    await applyMarkdown("Hello brave world.\n");
+    await caret("#editor p", offset);
+    await page.locator("#editor").evaluate((el, inputType) => {
+      el.dispatchEvent(new InputEvent("beforeinput", { inputType, bubbles: true, cancelable: true }));
+    }, inputType);
+    await page.waitForTimeout(80);
+    assert.equal(
+      await page.locator("#editor p").innerText(),
+      expected,
+      `${inputType} must delete to the line boundary`,
+    );
+  }
+  if (process.platform === "darwin") {
+    await applyMarkdown("Hello brave world.\n");
+    await caret("#editor p", 12);
+    await page.keyboard.press("Meta+Backspace");
+    await page.waitForTimeout(80);
+    assert.equal(await page.locator("#editor p").innerText(), "world.");
+  }
+  checks.push("line deletion (Cmd+Backspace) deletes to the line boundary");
   await applyMarkdown("Word\n");
   await caret("#editor p", 4);
   const caretX = () =>
