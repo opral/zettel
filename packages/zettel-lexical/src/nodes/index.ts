@@ -5,6 +5,7 @@ import {
   IS_CODE,
   IS_ITALIC,
   IS_STRIKETHROUGH,
+  IS_UNDERLINE,
   LexicalNode,
   TextNode,
   type DOMExportOutput,
@@ -43,6 +44,7 @@ const MARK_FORMATS: Record<string, number> = {
   bold: IS_BOLD,
   em: IS_ITALIC,
   italic: IS_ITALIC,
+  underline: IS_UNDERLINE,
   "strike-through": IS_STRIKETHROUGH,
   strikethrough: IS_STRIKETHROUGH,
   code: IS_CODE,
@@ -51,6 +53,7 @@ const MARK_FORMATS: Record<string, number> = {
 const FORMAT_MARKS: Array<[number, string]> = [
   [IS_BOLD, "strong"],
   [IS_ITALIC, "em"],
+  [IS_UNDERLINE, "underline"],
   [IS_STRIKETHROUGH, "strike-through"],
   [IS_CODE, "code"],
 ];
@@ -119,6 +122,7 @@ function markClass(marks: string[]): string {
 function decoratorTag(marks: string[]): string | undefined {
   if (marks.includes("strong")) return "strong";
   if (marks.includes("em")) return "em";
+  if (marks.includes("underline")) return "u";
   if (marks.includes("strike-through")) return "del";
   if (marks.includes("code")) return "code";
   return undefined;
@@ -127,7 +131,10 @@ function decoratorTag(marks: string[]): string | undefined {
 function applyMarkStyles(node: HTMLElement, marks: string[]): void {
   node.style.fontWeight = marks.includes("strong") ? "700" : "";
   node.style.fontStyle = marks.includes("em") ? "italic" : "";
-  node.style.textDecoration = marks.includes("strike-through") ? "line-through" : "";
+  node.style.textDecoration = [
+    marks.includes("underline") ? "underline" : "",
+    marks.includes("strike-through") ? "line-through" : "",
+  ].filter(Boolean).join(" ");
   node.style.fontFamily = marks.includes("code") ? "ui-monospace, SFMono-Regular, Consolas, monospace" : "";
 }
 

@@ -76,7 +76,7 @@ List items can contain multiple paragraphs, nested lists, quotes, and other bloc
 
 ### Marks and shared annotations
 
-`marks` contains decorator strings (`strong`, `em`, `strike-through`, `code`) and references to local annotation definitions. Link objects live in the enclosing text block or table cell’s `markDefs`.
+`marks` contains decorator strings (`strong`, `em`, `underline`, `strike-through`, `code`) and references to local annotation definitions. Link objects live in the enclosing text block or table cell’s `markDefs`.
 
 ```json
 {

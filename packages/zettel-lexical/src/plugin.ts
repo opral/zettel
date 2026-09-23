@@ -39,7 +39,7 @@ import {
 } from "./nodes/index.js";
 import { generateKey, type Link } from "./types.js";
 
-const ZETTEL_TEXT_FORMATS = new Set<TextFormatType>(["bold", "italic", "strikethrough", "code"]);
+const ZETTEL_TEXT_FORMATS = new Set<TextFormatType>(["bold", "italic", "underline", "strikethrough", "code"]);
 
 /** Apply, edit, or remove a link on selected prose text. */
 export const SET_ZETTEL_LINK_COMMAND = createCommand<string | null>("SET_ZETTEL_LINK_COMMAND");
@@ -119,9 +119,9 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand<TextFormatType>(FORMAT_TEXT_COMMAND, (format) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      // Zettel spans store strong, em, strike-through and code. Any other
-      // Lexical format (Cmd+U underline, sub/superscript, highlight) would
-      // be invisible, split the span and be dropped on export.
+      // Zettel spans store strong, em, underline, strike-through and code.
+      // Any other Lexical format (sub/superscript, highlight) would be
+      // invisible, split the span and be dropped on export.
       if (!ZETTEL_TEXT_FORMATS.has(format)) return true;
       selection.formatText(format);
       return true;

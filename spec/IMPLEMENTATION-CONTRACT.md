@@ -6,7 +6,7 @@ All content nodes have `_type` (reserved builtins `zettel_*`) and `_key` (docume
 Types:
 - TextBlock: `{_type:'zettel_block',_key,style:'normal'|'h1'..'h6',children:Inline[],markDefs:Link[]}`.
 - Span: `{_type:'zettel_span',_key,text:string,marks:string[]}`. Nonempty text, LF allowed as soft break; hard break is explicit node.
-- Link: `{_type:'zettel_link',_key,href:string,title?:string}` in markDefs only. marks are decorators strong/em/strike-through/code or block-local link keys, at most one link per span. Definitions shared across spans. No underline initially (GFM scope).
+- Link: `{_type:'zettel_link',_key,href:string,title?:string}` in markDefs only. marks are decorators strong/em/underline/strike-through/code or block-local link keys, at most one link per span. Definitions shared across spans. Underline has no GFM syntax: Markdown carries it as inline `<u>…</u>` (and reads `<ins>`), HTML as `<u>`.
 - Break: `{_type:'zettel_break',_key,marks:string[]}` inline, hard break.
 - Image: `{_type:'zettel_image',_key,src:string,alt:string,title?:string,marks:string[]}` inline.
 - InlineHtml: `{_type:'zettel_html_inline',_key,value:string,marks:string[]}` inline raw source.

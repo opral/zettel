@@ -20,7 +20,7 @@ const ajv = new Ajv2020({
 	addUsedSchema: false,
 });
 const core = ajv.compile(documentSchema);
-const decorators = new Set(["strong", "em", "strike-through", "code"]);
+const decorators = new Set(["strong", "em", "underline", "strike-through", "code"]);
 function jsonData(v: unknown, ancestors = new Set<object>()): boolean {
 	if (v === null || typeof v === "string" || typeof v === "boolean") return true;
 	if (typeof v === "number") return Number.isFinite(v);

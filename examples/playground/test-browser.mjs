@@ -132,17 +132,28 @@ try {
   );
   await applyMarkdown("Plain\n");
   await caret("#editor p", 5);
+  // No leading spaces: typing a space across a format boundary is
+  // opral/zettel#8's subject, not this check's.
   await page.keyboard.press("ControlOrMeta+u");
-  await page.keyboard.type(" text");
+  await page.keyboard.type("text");
   await page.keyboard.press("ControlOrMeta+u");
-  await page.keyboard.type(" more");
+  await page.keyboard.type("more");
   await page.waitForTimeout(80);
   assert.deepEqual(
     (await doc()).blocks[0].children.map((child) => [child.text, child.marks]),
-    [["Plain text more", []]],
-    "Cmd+U must not split spans with a format Zettel cannot store",
+    [
+      ["Plain", []],
+      ["text", ["underline"]],
+      ["more", []],
+    ],
+    "Cmd+U underlines what is typed next and toggles back off",
   );
-  checks.push("unsupported formats (Cmd+U) leave spans intact");
+  assert.equal(
+    await page.locator("#editor u, #editor [style*='underline']").count() > 0,
+    true,
+    "underlined text renders underlined",
+  );
+  checks.push("Cmd+U underlines and round-trips as the underline mark");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {

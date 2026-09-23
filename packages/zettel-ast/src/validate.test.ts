@@ -17,6 +17,22 @@ const paragraph = () => ({
 });
 const doc = (): any => ({ _type: "zettel_doc", blocks: [paragraph()] });
 describe("Zettel document validation", () => {
+	it("accepts the underline decorator", () => {
+		const document = {
+			_type: "zettel_doc",
+			blocks: [
+				{
+					_type: "zettel_block",
+					_key: "b",
+					style: "normal",
+					markDefs: [],
+					children: [{ _type: "zettel_span", _key: "s", text: "u", marks: ["underline"] }],
+				},
+			],
+		};
+		expect(validateDocument(document).ok).toBe(true);
+	});
+
 	it("validates shared marks and empty documents", () => {
 		const d = doc();
 		d.blocks[0].children.push({
