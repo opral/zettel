@@ -130,6 +130,19 @@ try {
   checks.push(
     "Enter splits text at the caret without moving or dropping trailing content",
   );
+  await applyMarkdown("Plain\n");
+  await caret("#editor p", 5);
+  await page.keyboard.press("ControlOrMeta+u");
+  await page.keyboard.type(" text");
+  await page.keyboard.press("ControlOrMeta+u");
+  await page.keyboard.type(" more");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks[0].children.map((child) => [child.text, child.marks]),
+    [["Plain text more", []]],
+    "Cmd+U must not split spans with a format Zettel cannot store",
+  );
+  checks.push("unsupported formats (Cmd+U) leave spans intact");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {

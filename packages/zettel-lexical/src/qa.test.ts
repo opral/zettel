@@ -57,3 +57,10 @@ it('undoes the first edit after load and never restores a previous document', ()
  editor.update(() => { editor.dispatchCommand(UNDO_COMMAND, undefined); }, { discrete: true });
  expect(exportDocument(editor).blocks[0]._key).toBe('new');
 });
+it('ignores text formats Zettel cannot store (Cmd+U) instead of splitting spans', () => {
+ const editor = setup();
+ editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'abc'); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'def'); }, { discrete: true });
+ editor.update(() => { (($getRoot().getFirstChildOrThrow() as any).getFirstChild() as TextNode).select(0, 3); editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'); }, { discrete: true });
+ expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => [n.text, n.marks])).toEqual([['abcdef', []]]);
+});
