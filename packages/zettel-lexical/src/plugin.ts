@@ -2,6 +2,8 @@ import {
   $getSelection,
   createCommand,
   $isRangeSelection,
+  $isTextNode,
+  COMMAND_PRIORITY_BEFORE_CRITICAL,
   COMMAND_PRIORITY_EDITOR,
   COMMAND_PRIORITY_LOW,
   COPY_COMMAND,
@@ -16,26 +18,30 @@ import {
   KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   LexicalEditor,
+  ParagraphNode,
   PASTE_COMMAND,
   REMOVE_TEXT_COMMAND,
   SELECT_ALL_COMMAND,
+  SELECTION_CHANGE_COMMAND,
   $getRoot,
   $isDecoratorNode,
   $isElementNode,
   $isLineBreakNode,
   $isRootNode,
-  $isTextNode,
   $selectAll,
   ElementNode,
   $setSelection,
+  toggleTextFormatType,
   type LexicalNode,
   type PointType,
   type RangeSelection,
   type TextFormatType,
 } from "lexical";
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
+import { NormalizeTripleClickSelectionExtension } from "@lexical/extension/NormalizeTripleClickSelectionExtension";
 import { mergeRegister } from "@lexical/utils";
 import { copyDocumentToClipboard, pasteClipboardData } from "./clipboard.js";
+import { $editRange, $removeSelectedText } from "./selection.js";
 import { exportDocument } from "./lexical-state.js";
 import { registerZettelMarkdownShortcuts } from "./markdown-shortcuts.js";
 import {
@@ -55,6 +61,27 @@ import {
 import { generateKey, type Link } from "./types.js";
 
 const ZETTEL_TEXT_FORMATS = new Set<TextFormatType>(["bold", "italic", "underline", "strikethrough", "code"]);
+/** How long after a triple click its selection change is expected (as in Lexical's NormalizeTripleClickSelectionExtension). */
+const TRIPLE_CLICK_SELECTION_MS = 100;
+
+/**
+ * The formats every selected character has. Lexical toggles a format on a
+ * range by `selection.format`, which it only derives from the DOM selection;
+ * a range selected in code keeps the caret's stale format, so derive it here.
+ */
+function $selectedTextFormat(selection: RangeSelection): number {
+  const [start, end] = selection.isBackward() ? [selection.focus, selection.anchor] : [selection.anchor, selection.focus];
+  let format: number | undefined;
+  for (const node of selection.getNodes()) {
+    if (!$isTextNode(node)) continue;
+    const size = node.getTextContentSize();
+    if (size === 0) continue;
+    if (node.getKey() === start.key && start.type === "text" && start.offset === size) continue;
+    if (node.getKey() === end.key && end.type === "text" && end.offset === 0) continue;
+    format = format === undefined ? node.getFormat() : format & node.getFormat();
+  }
+  return format ?? selection.format;
+}
 
 /** Apply, edit, or remove a link on selected prose text. */
 export const SET_ZETTEL_LINK_COMMAND = createCommand<string | null>("SET_ZETTEL_LINK_COMMAND");
@@ -122,20 +149,36 @@ export interface ZettelLexicalPluginOptions {
 
 /** Register normal editor commands plus Zettel clipboard integration. */
 export function registerZettelLexicalPlugin(editor: LexicalEditor, options: ZettelLexicalPluginOptions = {}): () => void {
-  const initialRoot = editor.getRootElement() as (HTMLElement & { __zettelEditor?: LexicalEditor }) | null;
-  initialRoot?.classList.add("zettel");
-  initialRoot?.setAttribute("data-zettel-doc", "true");
-  if (initialRoot) initialRoot.__zettelEditor = editor;
-  const unregisterRoot = editor.registerRootListener((root, previous) => {
-    previous?.removeEventListener("change", onChecklistChange);
-    previous?.removeEventListener("beforeinput", onPlainTextBeforeInput, true);
+  // Called at once with the current root, then on every root change. The
+  // returned cleanup runs before the next change and on unregister.
+  const unregisterRoot = editor.registerRootListener((root) => {
     const currentRoot = root as (HTMLElement & { __zettelEditor?: LexicalEditor }) | null;
-    currentRoot?.classList.add("zettel");
-    currentRoot?.setAttribute("data-zettel-doc", "true");
-    if (currentRoot) currentRoot.__zettelEditor = editor;
-    currentRoot?.addEventListener("change", onChecklistChange);
-    currentRoot?.addEventListener("beforeinput", onPlainTextBeforeInput, true);
+    if (!currentRoot) return;
+    currentRoot.classList.add("zettel");
+    currentRoot.setAttribute("data-zettel-doc", "true");
+    currentRoot.__zettelEditor = editor;
+    currentRoot.addEventListener("change", onChecklistChange);
+    currentRoot.addEventListener("beforeinput", onPlainTextBeforeInput, true);
+    currentRoot.addEventListener("mousedown", onPointerClick, true);
+    currentRoot.addEventListener("mouseup", onPointerClick, true);
+    return () => {
+      currentRoot.removeEventListener("change", onChecklistChange);
+      currentRoot.removeEventListener("beforeinput", onPlainTextBeforeInput, true);
+      currentRoot.removeEventListener("mousedown", onPointerClick, true);
+      currentRoot.removeEventListener("mouseup", onPointerClick, true);
+    };
   });
+  // A triple click selects a block and the browser puts the focus at the start
+  // of the next block, so typing or deleting would merge that block too.
+  // Lexical before 0.45 corrected this in core; it now lives in
+  // NormalizeTripleClickSelectionExtension, which only rich-text and
+  // plain-text editors get. Apply the same correction here.
+  let tripleClickAt = 0;
+  function onPointerClick(event: MouseEvent): void {
+    if (event.detail > 2) tripleClickAt = Date.now();
+  }
+  const $fixTripleClickOverselection = NormalizeTripleClickSelectionExtension.config?.$fixFocusOverselection;
+  if (!$fixTripleClickOverselection) throw new Error("@lexical/extension no longer provides $fixFocusOverselection");
   function onPlainTextBeforeInput(event: Event): void {
     const input = event as InputEvent;
     if (event.defaultPrevented || input.inputType !== "insertText" || input.isComposing || input.data === null) return;
@@ -174,6 +217,21 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       return true;
     }, COMMAND_PRIORITY_LOW) : () => {},
     unregisterRoot,
+    editor.registerCommand(SELECTION_CHANGE_COMMAND, () => {
+      if (tripleClickAt && Date.now() - tripleClickAt <= TRIPLE_CLICK_SELECTION_MS) {
+        tripleClickAt = 0;
+        $fixTripleClickOverselection();
+      }
+      return false;
+    }, COMMAND_PRIORITY_BEFORE_CRITICAL),
+    // Lexical creates a plain ParagraphNode where it needs an empty block:
+    // since 0.50 a select-all delete removes every block and leaves one, and
+    // inline content inserted at the root is wrapped in one. Zettel documents
+    // have no ParagraphNode, so turn it into an ordinary text block before it
+    // renders; otherwise Enter cannot split it and it has no stable key.
+    editor.registerNodeTransform(ParagraphNode, (paragraph) => {
+      paragraph.replace($createZettelTextBlockNode({ style: "normal", markDefs: [] }), true);
+    }),
     editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
     registerHistory(editor, createEmptyHistoryState(), 300),
     // Lexical routes typing in empty blocks (and other controlled insertion
@@ -200,17 +258,33 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
         next.insertText(text);
         return true;
       }
-      selection.insertText(text);
+      if (selection.isCollapsed()) {
+        selection.insertText(text);
+        return true;
+      }
+      // Replace the range as RangeSelection.insertText does (the text takes
+      // the format of the first selected character), but remove it through
+      // the guarded path.
+      const first = (selection.isBackward() ? selection.focus : selection.anchor).getNode();
+      const format = $isTextNode(first) ? first.getFormat() : selection.format;
+      const style = $isTextNode(first) ? first.getStyle() : selection.style;
+      $deleteSelection(selection, (current) => current.removeText());
+      const caret = $getSelection();
+      if (!$isRangeSelection(caret)) return false;
+      caret.format = format;
+      caret.style = style;
+      if (text) caret.insertText(text);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
-    editor.registerCommand<TextFormatType>(FORMAT_TEXT_COMMAND, (format) => {
+    editor.registerCommand(FORMAT_TEXT_COMMAND, (format) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       // Zettel spans store strong, em, underline, strike-through and code.
       // Any other Lexical format (sub/superscript, highlight) would be
       // invisible, split the span and be dropped on export.
       if (!ZETTEL_TEXT_FORMATS.has(format)) return true;
-      selection.formatText(format);
+      if (selection.isCollapsed()) selection.formatText(format);
+      else selection.formatText(format, toggleTextFormatType($selectedTextFormat(selection), format, null));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(COPY_COMMAND, (event) => copyDocumentToClipboard(editor, event && "clipboardData" in event ? event as ClipboardEvent : null), COMMAND_PRIORITY_EDITOR),
@@ -237,14 +311,14 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       if ($isRangeSelection(selection)) $deleteSelection(selection, (current) => current.removeText());
       return true;
     }, COMMAND_PRIORITY_EDITOR),
-    editor.registerCommand<KeyboardEvent>(KEY_BACKSPACE_COMMAND, (event) => {
+    editor.registerCommand(KEY_BACKSPACE_COMMAND, (event) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
       $deleteSelection(selection, (current) => current.deleteCharacter(true), true);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
-    editor.registerCommand<KeyboardEvent>(KEY_DELETE_COMMAND, (event) => {
+    editor.registerCommand(KEY_DELETE_COMMAND, (event) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
@@ -260,7 +334,8 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(DELETE_WORD_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      $deleteSelection(selection, (current) => current.deleteWord(isBackward), isBackward);
+      // A word or line deletion of a range deletes the range.
+      $deleteSelection(selection, (current) => current.isCollapsed() ? current.deleteWord(isBackward) : current.deleteCharacter(isBackward), isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     // Cmd+Backspace / Cmd+Delete on macOS; Lexical has already prevented the
@@ -268,17 +343,17 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(DELETE_LINE_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      $deleteSelection(selection, (current) => current.deleteLine(isBackward), isBackward);
+      $deleteSelection(selection, (current) => current.isCollapsed() ? current.deleteLine(isBackward) : current.deleteCharacter(isBackward), isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
-    editor.registerCommand<KeyboardEvent>(KEY_ENTER_COMMAND, (event) => {
+    editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
       const current = $getSelection();
       if (!$isRangeSelection(current)) return false;
       let selection: RangeSelection = current;
       // Return replaces a selected range before it creates a block or a hard
       // break. Otherwise selected text could survive a structural edit.
       if (!selection.isCollapsed()) {
-        selection.removeText();
+        $removeSelectedText(selection);
         const next = $getSelection();
         if (!$isRangeSelection(next)) return false;
         selection = next;
@@ -470,7 +545,7 @@ function isDocumentEdge(point: PointType, leaf: LexicalNode | null, edge: "start
 function $deleteSelection(selection: RangeSelection, remove: (selection: RangeSelection) => void, isBackward = false): void {
   if (isBackward && $liftAtStart(selection)) return;
   const whole = $selectsWholeDocument(selection);
-  remove(selection);
+  $editRange(selection, () => remove(selection));
   if (!whole) return;
   const root = $getRoot();
   if (root.getAllTextNodes().some((node) => node.getTextContentSize() > 0)) return;

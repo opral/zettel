@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { $getRoot, CONTROLLED_TEXT_INSERTION_COMMAND, FORMAT_TEXT_COMMAND, REMOVE_TEXT_COMMAND, UNDO_COMMAND, REDO_COMMAND, TextNode } from 'lexical';
+import { $getRoot, $getSelection, $isRangeSelection, CONTROLLED_TEXT_INSERTION_COMMAND, FORMAT_TEXT_COMMAND, REMOVE_TEXT_COMMAND, UNDO_COMMAND, REDO_COMMAND, TextNode } from 'lexical';
 import { createZettelEditor, registerZettelLexicalPlugin, loadDocument, exportDocument } from './index.js';
 function setup(link = false) {
  const editor = createZettelEditor();
@@ -97,4 +97,23 @@ it('ignores formats Zettel cannot store (highlight, subscript) instead of splitt
  editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'abc'); }, { discrete: true });
  editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'highlight'); editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'subscript'); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'def'); }, { discrete: true });
  expect((exportDocument(editor).blocks[0] as any).children.map((n: any) => [n.text, n.marks])).toEqual([['abcdef', []]]);
+});
+it('toggles a format on a range by what every selected character has, however the range was selected', () => {
+ // Lexical 0.47+ toggles by selection.format, which only a DOM selection
+ // change derives; a range selected in code must behave the same.
+ const editor = setup();
+ editor.update(() => { $getRoot().getFirstChildOrThrow().selectStart(); editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, 'hello world'); }, { discrete: true });
+ const marks = () => (exportDocument(editor).blocks[0] as any).children.map((n: any) => [n.text, n.marks]);
+ const select = (from: number, to: number) => editor.update(() => { (($getRoot().getFirstChildOrThrow() as any).getFirstChild() as TextNode).select(from, to); }, { discrete: true });
+ select(0, 5);
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'); }, { discrete: true });
+ expect(marks()).toEqual([['hello', ['strong']], [' world', []]]);
+ // Partly bold: bold everything.
+ editor.update(() => { const block = $getRoot().getFirstChildOrThrow() as any; block.getFirstChild().select(0, 0); const s = $getSelection(); if ($isRangeSelection(s)) s.focus.set(block.getLastChild().getKey(), 6, 'text'); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'); }, { discrete: true });
+ expect(marks()).toEqual([['hello', ['strong']], [' world', ['strong']]]);
+ // All bold: unbold.
+ editor.update(() => { const block = $getRoot().getFirstChildOrThrow() as any; block.getFirstChild().select(0, 0); const s = $getSelection(); if ($isRangeSelection(s)) s.focus.set(block.getLastChild().getKey(), 6, 'text'); }, { discrete: true });
+ editor.update(() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'); }, { discrete: true });
+ expect(marks()).toEqual([['hello', []], [' world', []]]);
 });

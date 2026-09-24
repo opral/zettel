@@ -61,6 +61,24 @@ describe("public binding boundaries", () => {
       expect(fromLexicalState(toLexicalState(doc))).toEqual(doc);
     expect(() => fromLexicalState({})).toThrow();
   });
+  it("reads plain Lexical paragraphs and formatted text", () => {
+    // Lexical 0.50+ builds a registered replacement (TextNode -> ZettelSpanNode)
+    // with a zero-argument constructor before applying the JSON.
+    const state = {
+      root: {
+        type: "root", version: 1, direction: null, format: "", indent: 0,
+        children: [{
+          type: "paragraph", version: 1, direction: null, format: "", indent: 0, textFormat: 0, textStyle: "",
+          children: [
+            { type: "text", version: 1, text: "bold", format: 1, style: "", mode: "normal", detail: 0 },
+            { type: "text", version: 1, text: " plain", format: 0, style: "", mode: "normal", detail: 0 },
+          ],
+        }],
+      },
+    };
+    const result = fromLexicalState(state as never);
+    expect((result.blocks[0] as import("@opral/zettel-ast").TextBlock).children.map((child) => [(child as import("@opral/zettel-ast").Span).text, (child as import("@opral/zettel-ast").Span).marks])).toEqual([["bold", ["strong"]], [" plain", []]]);
+  });
   it("preserves opaque extension atoms at their original inline and block locations", () => {
     const doc = document();
     (doc.blocks[0] as any).children.push({

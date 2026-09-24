@@ -611,6 +611,62 @@ try {
   );
   checks.push("typing after a trailing hard break keeps the text on the new line");
 
+  // Lexical 0.50 removes the blocks on a select-all delete and leaves a plain
+  // ParagraphNode; it must become a Zettel block that Enter can split.
+  await applyMarkdown("# Heading\n\nBody\n");
+  await caret("#editor p", 2);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("fresh text");
+  await page.waitForTimeout(80);
+  assert.equal(await page.locator("#editor > *").count(), 1);
+  assert.equal(await page.locator("#editor p.zettel_block[data-zettel-key]").count(), 1);
+  edited = await doc();
+  assert.equal(edited.blocks[0]._key, (await doc()).blocks[0]._key);
+  await caret("#editor p .zettel_span", 6);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) => block.children.map((node) => node.text).join("")),
+    ["fresh ", "text"],
+  );
+  checks.push("select-all delete leaves an editable Zettel block");
+
+  // Lexical (<= 0.51) threw inside removeText for a range from the start of a
+  // block into the first of several text runs of a later block.
+  await applyMarkdown("one **two**\n\n**four** five six\n");
+  await page.locator("#editor p").first().evaluate((first) => {
+    first.closest("[contenteditable=true]").focus();
+    const textIn = (el) => document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+    const range = document.createRange();
+    range.setStart(textIn(first), 0);
+    range.setEnd(textIn(first.nextElementSibling), 3);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+  });
+  await page.waitForTimeout(40);
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("X");
+  await page.waitForTimeout(80);
+  assert.equal(await page.locator("#diagnostics").textContent(), "");
+  assert.deepEqual(
+    (await doc()).blocks.map((block) => block.children.map((node) => node.text).join("")),
+    ["Xr five six"],
+  );
+  checks.push("deleting a range that crosses blocks into a text run works");
+
+  // A triple click must select only its block, not reach into the next one.
+  await applyMarkdown("First paragraph\n\nSecond paragraph\n");
+  await page.locator("#editor p").first().click({ clickCount: 3 });
+  await page.waitForTimeout(150);
+  await page.keyboard.type("X");
+  await page.waitForTimeout(80);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) => block.children.map((node) => node.text).join("")),
+    ["X", "Second paragraph"],
+  );
+  checks.push("typing over a triple-click selection keeps the next block");
+
   await applyMarkdown("- [ ] First second\n- Last\n");
   await caret("#editor li p", 5);
   await page.keyboard.press("Enter");

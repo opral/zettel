@@ -2,6 +2,7 @@ import { $getRoot, $getSelection, $isRangeSelection, ElementNode, type LexicalEd
 import { createDocument, generateKey, type Block, type Document, type Inline, type TextBlock, type List, type Quote, type Code, type Table, type TableCell, type Span, type Image, type InlineHtml, type Link } from "./types.js";
 import { createLexicalNode, type NodeRegistryOptions, createNodeRegistry, type ZettelNodeRegistry, ZettelBreakNode, ZettelImageNode, ZettelInlineHtmlNode, ZettelSpanNode, ZettelTextBlockNode, ZettelTableCellNode, ZettelTableNode, ZettelTableRowNode, exportBlockNode, exportInlineNode } from "./nodes/index.js";
 import { assertEditorDocument, exportDocument } from "./lexical-state.js";
+import { $removeSelectedText } from "./selection.js";
 import { importHtml, toHtml as renderHtml } from "@opral/zettel-html";
 
 export interface ClipboardPayload {
@@ -100,7 +101,12 @@ export function pasteClipboardData(editor: LexicalEditor, data: ClipboardPayload
   const document = parsed.document;
   const registry = options && "nodes" in options ? options : createNodeRegistry(options);
   editor.update(() => {
-    const selection = $getSelection();
+    let selection = $getSelection();
+    // Replace a selected range first, then paste at the caret it leaves.
+    if ($isRangeSelection(selection) && !selection.isCollapsed()) {
+      $removeSelectedText(selection);
+      selection = $getSelection();
+    }
     const nodes = document.blocks.map((block) => createLexicalNode(block, registry));
     if ($isRangeSelection(selection)) {
       const first = document.blocks[0] as any;
@@ -359,8 +365,8 @@ function selectedTable(table: ZettelTableNode, selectedCells: ZettelTableCellNod
   const width = Math.max(1, ...widths);
   for (const row of rows) while (row.cells.length < width) row.cells.push({ _type: "zettel_table_cell", _key: generateKey(), children: [], markDefs: [] });
   const columns = selectedCells.map((cell) => {
-    const row = cell.getParent<ZettelTableRowNode>();
-    return row ? row.getChildren().indexOf(cell) : -1;
+    const row = cell.getParent();
+    return row instanceof ZettelTableRowNode ? row.getChildren().indexOf(cell) : -1;
   }).filter((column) => column >= 0);
   return { _type: "zettel_table", _key: generateKey(), align: columns.slice(0, width).map((column) => source.align[column] ?? null), rows };
 }
