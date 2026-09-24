@@ -3,6 +3,7 @@ import {
   createCommand,
   $isRangeSelection,
   COMMAND_PRIORITY_EDITOR,
+  COMMAND_PRIORITY_LOW,
   COPY_COMMAND,
   CONTROLLED_TEXT_INSERTION_COMMAND,
   CUT_COMMAND,
@@ -140,7 +141,10 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
   }
   return mergeRegister(
     options.markdownShortcuts ? registerZettelMarkdownShortcuts(editor, $setZettelLink) : () => {},
-    options.onLinkShortcut ? editor.registerCommand<KeyboardEvent>(KEY_DOWN_COMMAND, (event) => {
+    // Above COMMAND_PRIORITY_EDITOR: from Lexical 0.50, core's own keydown
+    // dispatch is a KEY_DOWN_COMMAND listener at that priority and handles
+    // every key, so a listener registered after it there never runs.
+    options.onLinkShortcut ? editor.registerCommand(KEY_DOWN_COMMAND, (event) => {
       if (!isLinkShortcut(event)) return false;
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
@@ -159,7 +163,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       if (result instanceof Promise) void result.then(apply, () => {});
       else apply(result);
       return true;
-    }, COMMAND_PRIORITY_EDITOR) : () => {},
+    }, COMMAND_PRIORITY_LOW) : () => {},
     unregisterRoot,
     editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
     registerHistory(editor, createEmptyHistoryState(), 300),
