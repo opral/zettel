@@ -93,10 +93,7 @@ describe("Zettel Lexical state", () => {
     const document = fixture();
     loadDocument(editor, document);
     editor.update(() => {
-      const root = editor.getEditorState()._nodeMap.get("root") as any;
-      const block = root.getFirstChild();
-      const span = block.getFirstChild();
-      span.setTextContent("Edited ");
+      $getRoot().getAllTextNodes()[0]!.setTextContent("Edited ");
     }, { discrete: true });
     expect((exportDocument(editor).blocks[0] as any).children[0].text).toBe("Edited ");
   });
