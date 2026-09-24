@@ -164,7 +164,7 @@ export class ZettelSpanNode extends TextNode {
   private sourceText?: string;
   private linkHref?: string;
 
-  constructor(data: Partial<Span> & { text?: string }, key?: NodeKey) {
+  constructor(data: Partial<Span> & { text?: string } = {}, key?: NodeKey) {
     super(data.text ?? "", key);
     this._key = data._key ?? generateKey();
     this.zettelMarks = [...(data.marks ?? [])];
@@ -268,7 +268,7 @@ export class ZettelTextBlockNode extends ZettelElementNode {
   style: TextBlock["style"];
   markDefs: Link[];
 
-  constructor(data: Partial<TextBlock> & { type?: string }, key?: NodeKey) {
+  constructor(data: Partial<TextBlock> & { type?: string } = {}, key?: NodeKey) {
     super(key);
     this._key = data._key ?? generateKey();
     this.style = data.style ?? "normal";
@@ -310,7 +310,7 @@ export class ZettelTextBlockNode extends ZettelElementNode {
 export class ZettelBreakNode extends LineBreakNode {
   readonly _key: string;
   marks: string[];
-  constructor(data: Partial<Break>, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.marks = [...(data.marks ?? [])]; }
+  constructor(data: Partial<Break> = {}, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.marks = [...(data.marks ?? [])]; }
   static getType(): string { return "zettel_break"; }
   static clone(node: ZettelBreakNode): ZettelBreakNode { return new ZettelBreakNode({ _key: node._key, marks: node.marks }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelBreakNode { return new ZettelBreakNode(node as unknown as Break); }
@@ -328,7 +328,7 @@ export class ZettelImageNode extends ZettelElementNode {
   title?: string;
   marks: string[];
   private linkHref?: string;
-  constructor(data: Partial<Image>, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.src = data.src ?? ""; this.alt = data.alt ?? ""; this.title = data.title; this.marks = [...(data.marks ?? [])]; }
+  constructor(data: Partial<Image> = {}, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.src = data.src ?? ""; this.alt = data.alt ?? ""; this.title = data.title; this.marks = [...(data.marks ?? [])]; }
   override updateDOM(previous: this): boolean { return previous.src !== this.src || previous.alt !== this.alt || previous.title !== this.title || previous.linkHref !== this.linkHref; }
   static getType(): string { return "zettel_image"; }
   static clone(node: ZettelImageNode): ZettelImageNode { const result = new ZettelImageNode(node.toZettel(), node.__key); result.linkHref = node.linkHref; return result; }
@@ -345,7 +345,7 @@ export class ZettelInlineHtmlNode extends ZettelElementNode {
   readonly _key: string;
   value: string;
   marks: string[];
-  constructor(data: Partial<InlineHtml>, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.value = data.value ?? ""; this.marks = [...(data.marks ?? [])]; }
+  constructor(data: Partial<InlineHtml> = {}, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.value = data.value ?? ""; this.marks = [...(data.marks ?? [])]; }
   override updateDOM(previous: this): boolean { return previous.value !== this.value; }
   static getType(): string { return "zettel_html_inline"; }
   static clone(node: ZettelInlineHtmlNode): ZettelInlineHtmlNode { return new ZettelInlineHtmlNode(node.toZettel(), node.__key); }
@@ -365,7 +365,7 @@ abstract class ZettelBlockNode extends ZettelElementNode {
 
 export class ZettelListNode extends ZettelBlockNode {
   kind: List["kind"]; start?: number; spread: boolean;
-  constructor(data: Partial<List>, key?: NodeKey) { super(data._key, key); this.kind = data.kind ?? "bullet"; this.start = data.start; this.spread = data.spread ?? false; }
+  constructor(data: Partial<List> = {}, key?: NodeKey) { super(data._key, key); this.kind = data.kind ?? "bullet"; this.start = data.start; this.spread = data.spread ?? false; }
   override updateDOM(previous: this): boolean { return previous.kind !== this.kind || previous.start !== this.start || previous.spread !== this.spread; }
   static getType(): string { return "zettel_list"; }
   static clone(node: ZettelListNode): ZettelListNode { return new ZettelListNode(node.toZettel(), node.__key); }
@@ -377,7 +377,7 @@ export class ZettelListNode extends ZettelBlockNode {
 
 export class ZettelListItemNode extends ZettelBlockNode {
   spread: boolean; checked?: boolean;
-  constructor(data: Partial<ListItem>, key?: NodeKey) { super(data._key, key); this.spread = data.spread ?? false; this.checked = data.checked; }
+  constructor(data: Partial<ListItem> = {}, key?: NodeKey) { super(data._key, key); this.spread = data.spread ?? false; this.checked = data.checked; }
   override updateDOM(previous: this): boolean { return previous.checked !== this.checked || previous.spread !== this.spread; }
   static getType(): string { return "zettel_list_item"; }
   static clone(node: ZettelListItemNode): ZettelListItemNode { return new ZettelListItemNode(node.toZettel(), node.__key); }
@@ -388,7 +388,7 @@ export class ZettelListItemNode extends ZettelBlockNode {
 }
 
 export class ZettelQuoteNode extends ZettelBlockNode {
-  constructor(data: Partial<Quote>, key?: NodeKey) { super(data._key, key); }
+  constructor(data: Partial<Quote> = {}, key?: NodeKey) { super(data._key, key); }
   static getType(): string { return "zettel_quote"; }
   static clone(node: ZettelQuoteNode): ZettelQuoteNode { return new ZettelQuoteNode({ _type: "zettel_quote", _key: node._key, blocks: [] }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelQuoteNode { return new ZettelQuoteNode(node as unknown as Quote); }
@@ -399,7 +399,7 @@ export class ZettelQuoteNode extends ZettelBlockNode {
 
 export class ZettelCodeNode extends ZettelBlockNode {
   code: string; language?: string; meta?: string;
-  constructor(data: Partial<Code>, key?: NodeKey) { super(data._key, key); this.code = data.code ?? ""; this.language = data.language; this.meta = data.meta; }
+  constructor(data: Partial<Code> = {}, key?: NodeKey) { super(data._key, key); this.code = data.code ?? ""; this.language = data.language; this.meta = data.meta; }
   override updateDOM(previous: this): boolean { return previous.language !== this.language; }
   static getType(): string { return "zettel_code"; }
   static clone(node: ZettelCodeNode): ZettelCodeNode { return new ZettelCodeNode(node.toZettel(), node.__key); }
@@ -410,7 +410,7 @@ export class ZettelCodeNode extends ZettelBlockNode {
 }
 
 export class ZettelRuleNode extends ZettelBlockNode {
-  constructor(data: Partial<Rule>, key?: NodeKey) { super(data._key, key); }
+  constructor(data: Partial<Rule> = {}, key?: NodeKey) { super(data._key, key); }
   static getType(): string { return "zettel_rule"; }
   static clone(node: ZettelRuleNode): ZettelRuleNode { return new ZettelRuleNode({ _type: "zettel_rule", _key: node._key }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelRuleNode { return new ZettelRuleNode(node as unknown as Rule); }
@@ -421,7 +421,7 @@ export class ZettelRuleNode extends ZettelBlockNode {
 
 export class ZettelTableNode extends ZettelBlockNode {
   align: Table["align"];
-  constructor(data: Partial<Table>, key?: NodeKey) { super(data._key, key); this.align = data.align ?? []; }
+  constructor(data: Partial<Table> = {}, key?: NodeKey) { super(data._key, key); this.align = data.align ?? []; }
   static getType(): string { return "zettel_table"; }
   static clone(node: ZettelTableNode): ZettelTableNode { return new ZettelTableNode(node.toZettel(), node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelTableNode { return new ZettelTableNode(node as unknown as Table); }
@@ -431,7 +431,7 @@ export class ZettelTableNode extends ZettelBlockNode {
 }
 
 export class ZettelTableRowNode extends ZettelBlockNode {
-  constructor(data: Partial<TableRow>, key?: NodeKey) { super(data._key, key); }
+  constructor(data: Partial<TableRow> = {}, key?: NodeKey) { super(data._key, key); }
   static getType(): string { return "zettel_table_row"; }
   static clone(node: ZettelTableRowNode): ZettelTableRowNode { return new ZettelTableRowNode({ _type: "zettel_table_row", _key: node._key, cells: [] }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelTableRowNode { return new ZettelTableRowNode(node as unknown as TableRow); }
@@ -442,15 +442,17 @@ export class ZettelTableRowNode extends ZettelBlockNode {
 
 export class ZettelTableCellNode extends ZettelBlockNode {
   markDefs: Link[];
-  constructor(data: Partial<TableCell>, key?: NodeKey) { super(data._key, key); this.markDefs = data.markDefs ?? []; }
+  constructor(data: Partial<TableCell> = {}, key?: NodeKey) { super(data._key, key); this.markDefs = data.markDefs ?? []; }
   static getType(): string { return "zettel_table_cell"; }
   static clone(node: ZettelTableCellNode): ZettelTableCellNode { return new ZettelTableCellNode({ _type: "zettel_table_cell", _key: node._key, children: [], markDefs: node.markDefs }, node.__key); }
   static importJSON(node: SerializedZettelNode): ZettelTableCellNode { return new ZettelTableCellNode(node as unknown as TableCell); }
   toZettel(): TableCell { return { _type: "zettel_table_cell", _key: this._key, children: this.getChildren().flatMap(exportInlineNode), markDefs: this.markDefs }; }
   override exportJSON(): any { return jsonFor(this, { _type: "zettel_table_cell", _key: this._key, markDefs: this.markDefs }); }
   override createDOM(_config: EditorConfig): HTMLElement {
-    const row = this.getParent<ZettelTableRowNode>();
-    const table = row?.getParent<ZettelTableNode>();
+    const parent = this.getParent();
+    const row = parent instanceof ZettelTableRowNode ? parent : null;
+    const grandparent = row?.getParent();
+    const table = grandparent instanceof ZettelTableNode ? grandparent : null;
     const isHeader = Boolean(row && table && table.getFirstChild() === row);
     const cell = element(isHeader ? "th" : "td", "zettel_table_cell", this._key);
     const column = row?.getChildren().indexOf(this) ?? -1;
@@ -462,7 +464,7 @@ export class ZettelTableCellNode extends ZettelBlockNode {
 
 export class ZettelHtmlNode extends ZettelBlockNode {
   value: string;
-  constructor(data: Partial<Html>, key?: NodeKey) { super(data._key, key); this.value = data.value ?? ""; }
+  constructor(data: Partial<Html> = {}, key?: NodeKey) { super(data._key, key); this.value = data.value ?? ""; }
   override updateDOM(previous: this): boolean { return previous.value !== this.value; }
   static getType(): string { return "zettel_html"; }
   static clone(node: ZettelHtmlNode): ZettelHtmlNode { return new ZettelHtmlNode({ _type: "zettel_html", _key: node._key, value: node.value }, node.__key); }
@@ -478,7 +480,7 @@ export class ZettelHtmlNode extends ZettelBlockNode {
 export class ZettelUnknownNode extends ZettelBlockNode {
   readonly payload: Record<string, unknown>;
   private readonly inline: boolean;
-  constructor(payload: Record<string, unknown>, key?: NodeKey, inline = false) { super(typeof payload._key === "string" ? payload._key : undefined, key); this.payload = payload; this.inline = inline; }
+  constructor(payload: Record<string, unknown> = {}, key?: NodeKey, inline = false) { super(typeof payload._key === "string" ? payload._key : undefined, key); this.payload = payload; this.inline = inline; }
   override updateDOM(previous: this): boolean { return previous.payload !== this.payload || previous.inline !== this.inline; }
   static getType(): string { return "zettel_unknown"; }
   static clone(node: ZettelUnknownNode): ZettelUnknownNode { return new ZettelUnknownNode(node.payload, node.__key, node.inline); }

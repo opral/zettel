@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./nodes/index.js";
 export * from "./lexical-state.js";
 export * from "./clipboard.js";
+export { $removeSelectedText } from "./selection.js";
 export { SET_ZETTEL_LINK_COMMAND, $setZettelLink, getZettelDocument, registerZettelLexicalPlugin, setZettelListItemChecked, type ZettelLexicalPluginOptions } from "./plugin.js";
 
 import { createEditor, type CreateEditorArgs, type LexicalEditor } from "lexical";
