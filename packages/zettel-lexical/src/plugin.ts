@@ -1,5 +1,6 @@
 import {
   $getSelection,
+  $getNodeByKey,
   createCommand,
   $isRangeSelection,
   $isTextNode,
@@ -23,7 +24,6 @@ import {
   REMOVE_TEXT_COMMAND,
   SELECT_ALL_COMMAND,
   SELECTION_CHANGE_COMMAND,
-  $getEditor,
   $getRoot,
   $isDecoratorNode,
   $isElementNode,
@@ -208,7 +208,8 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       const apply = (result: string | null | undefined) => {
         if (result === undefined) return;
         editor.update(() => {
-          if (saved.getNodes().every((node) => node.isAttached())) $setSelection(saved.clone());
+          if (!$selectionPointsAttached(saved)) return;
+          $setSelection(saved.clone());
           $setZettelLink(result);
         });
       };
@@ -479,7 +480,7 @@ function $resolveLinkMarks(block: ZettelTextBlockNode | ZettelTableCellNode): vo
     const unresolved = marks.filter((mark) => !DECORATOR_MARKS.has(mark) && !markDefs.some((definition) => definition._key === mark));
     if (!unresolved.length) continue;
     const next = marks.filter((mark) => !unresolved.includes(mark));
-    const href = (child instanceof ZettelSpanNode || child instanceof ZettelImageNode ? child.getLinkHref() : undefined) ?? $previousLinkHref(child, unresolved);
+    const href = child instanceof ZettelSpanNode || child instanceof ZettelImageNode ? child.getLinkHref() : undefined;
     if (href && !next.some((mark) => markDefs.some((definition) => definition._key === mark))) {
       let definition = markDefs.find((candidate) => candidate.href === href);
       if (!definition) {
@@ -696,17 +697,14 @@ function currentLinkHref(selection: RangeSelection): string | undefined {
   return undefined;
 }
 
-/**
- * The href a node's link mark resolved to before this update, in the block
- * that held it then. Nodes restored from serialized Lexical state do not
- * carry their href, only the key of a definition in their old block.
- */
-function $previousLinkHref(node: LexicalNode, marks: string[]): string | undefined {
-  const previous = $getEditor().getEditorState()._nodeMap;
-  const parentKey = previous.get(node.getKey())?.__parent;
-  const parent = parentKey ? previous.get(parentKey) : undefined;
-  if (!(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) return undefined;
-  return marks.map((mark) => parent.markDefs.find((definition) => definition._key === mark)?.href).find(Boolean);
+function $selectionPointsAttached(selection: RangeSelection): boolean {
+  const pointIsAttached = (point: PointType): boolean => {
+    const node = $getNodeByKey(point.key);
+    if (!node) return false;
+    if (point.type === "text") return $isTextNode(node) && point.offset <= node.getTextContentSize();
+    return $isElementNode(node) && point.offset <= node.getChildrenSize();
+  };
+  return pointIsAttached(selection.anchor) && pointIsAttached(selection.focus);
 }
 
 function onChecklistChange(event: Event): void {

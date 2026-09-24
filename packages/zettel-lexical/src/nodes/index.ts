@@ -162,6 +162,8 @@ export class ZettelSpanNode extends TextNode {
   private zettelMarks: string[];
   private source?: Span;
   private sourceText?: string;
+  // This Lexical-state cache lets links survive generic node moves. It is not
+  // part of the Zettel AST; the authoritative link definition stays in markDefs.
   private linkHref?: string;
 
   constructor(data: Partial<Span> & { text?: string } = {}, key?: NodeKey) {
@@ -182,12 +184,14 @@ export class ZettelSpanNode extends TextNode {
     return result;
   }
   static importJSON(node: SerializedZettelNode): ZettelSpanNode {
-    return new ZettelSpanNode({
+    const result = new ZettelSpanNode({
       _type: "zettel_span",
       _key: typeof node._key === "string" ? node._key : undefined,
       text: typeof node.text === "string" ? node.text : "",
       marks: Array.isArray(node.marks) ? node.marks.filter((mark): mark is string => typeof mark === "string") : [],
     });
+    result.linkHref = typeof node.linkHref === "string" ? node.linkHref : undefined;
+    return result;
   }
   override splitText(...offsets: number[]): TextNode[] {
     const marks = this.toZettel().marks;
@@ -220,7 +224,10 @@ export class ZettelSpanNode extends TextNode {
     if (this.source && this.sourceText === this.getTextContent() && marks.join("\u0000") === this.source.marks.join("\u0000")) return this.source;
     return { _type: "zettel_span", _key: this._key, text: this.getTextContent(), marks };
   }
-  override exportJSON(): any { return jsonFor(this, this.toZettel() as unknown as Record<string, unknown>); }
+  override exportJSON(): any {
+    const linkHref = this.resolvedLinkHref();
+    return jsonFor(this, { ...this.toZettel(), ...(linkHref === undefined ? {} : { linkHref }) });
+  }
   override createDOM(_config: EditorConfig): HTMLElement {
     const marks = this.toZettel().marks;
     const decorator = decoratorTag(marks);
@@ -330,7 +337,7 @@ export class ZettelImageNode extends ZettelElementNode {
   title?: string;
   marks: string[];
   private linkHref?: string;
-  constructor(data: Partial<Image> = {}, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.src = data.src ?? ""; this.alt = data.alt ?? ""; this.title = data.title; this.marks = [...(data.marks ?? [])]; }
+  constructor(data: Partial<Image> & { linkHref?: string } = {}, key?: NodeKey) { super(key); this._key = data._key ?? generateKey(); this.src = data.src ?? ""; this.alt = data.alt ?? ""; this.title = data.title; this.marks = [...(data.marks ?? [])]; this.linkHref = data.linkHref; }
   override updateDOM(previous: this): boolean { return previous.src !== this.src || previous.alt !== this.alt || previous.title !== this.title || previous.linkHref !== this.linkHref; }
   static getType(): string { return "zettel_image"; }
   static clone(node: ZettelImageNode): ZettelImageNode { const result = new ZettelImageNode(node.toZettel(), node.__key); result.linkHref = node.linkHref; return result; }
@@ -339,7 +346,7 @@ export class ZettelImageNode extends ZettelElementNode {
   setLinkHref(href: string | undefined): this { const writable = this.getWritable(); writable.linkHref = href; return writable; }
   getLinkHref(): string | undefined { return this.getLatest().linkHref; }
   toZettel(): Image { const image: Image = { _type: "zettel_image", _key: this._key, src: this.src, alt: this.alt, marks: [...this.marks] }; if (this.title !== undefined) image.title = this.title; return image; }
-  override exportJSON(): any { return jsonFor(this, this.toZettel() as unknown as Record<string, unknown>); }
+  override exportJSON(): any { return jsonFor(this, { ...this.toZettel(), ...(this.linkHref === undefined ? {} : { linkHref: this.linkHref }) }); }
   override createDOM(_config: EditorConfig): HTMLElement { const wrapper = element(this.linkHref ? "a" : "span", "zettel_image", this._key); if (this.linkHref) wrapper.setAttribute("href", safeLinkUrl(this.linkHref)); const image = document.createElement("img"); image.src = safeImageUrl(this.src); image.alt = this.alt; if (this.title !== undefined) image.title = this.title; wrapper.append(image); return wrapper; }
   override exportDOM(_editor: LexicalEditor): DOMExportOutput { return { element: this.createDOM({} as EditorConfig) }; }
 }

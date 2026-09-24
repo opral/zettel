@@ -90,36 +90,59 @@ const TRAILING_URL = /(^|\s)(https?:\/\/[^\s<>"]+)$/i;
 
 /** The caret moved one character right in the node that changed: a character was typed. */
 function typedCharacter(editorState: EditorState, prevEditorState: EditorState, dirtyLeaves: Set<string>): { key: string; offset: number } | null {
-  const selection = editorState._selection;
-  const previous = prevEditorState._selection;
-  if (!$isRangeSelection(selection) || !$isRangeSelection(previous) || !selection.isCollapsed() || !previous.isCollapsed()) return null;
-  if (selection.anchor.type !== "text" || !dirtyLeaves.has(selection.anchor.key)) return null;
-  const offset = selection.anchor.offset;
-  const sameNode = previous.anchor.key === selection.anchor.key && previous.anchor.offset + 1 === offset;
+  const current = editorState.read(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection) || !selection.isCollapsed() || selection.anchor.type !== "text") return null;
+    const key = selection.anchor.key;
+    if (!dirtyLeaves.has(key)) return null;
+    const node = $getNodeByKey(key);
+    if (!(node instanceof ZettelSpanNode)) return null;
+    return { key, offset: selection.anchor.offset, length: node.getTextContentSize() };
+  });
+  if (!current) return null;
+  const previous = prevEditorState.read(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection) || !selection.isCollapsed()) return null;
+    const node = $getNodeByKey(current.key);
+    return {
+      key: selection.anchor.key,
+      offset: selection.anchor.offset,
+      length: node instanceof ZettelSpanNode ? node.getTextContentSize() : 0,
+    };
+  });
+  if (!previous) return null;
+  const offset = current.offset;
+  const sameNode = previous.key === current.key && previous.offset + 1 === offset;
   if (!sameNode && offset !== 1) return null;
-  const node = editorState._nodeMap.get(selection.anchor.key);
-  if (!(node instanceof ZettelSpanNode)) return null;
   // Only a one-character insertion, not a paste or a replacement.
-  const before = prevEditorState._nodeMap.get(selection.anchor.key);
-  const length = editorState.read(() => node.getTextContentSize());
-  const previousLength = before instanceof ZettelSpanNode ? prevEditorState.read(() => before.getTextContentSize()) : 0;
-  if (length !== previousLength + 1) return null;
-  return { key: selection.anchor.key, offset };
+  if (current.length !== previous.length + 1) return null;
+  return { key: current.key, offset };
 }
 
 /** Return created a new text block and put the caret at its start. */
 function splitBlock(editorState: EditorState, prevEditorState: EditorState): string | null {
-  const selection = editorState._selection;
-  if (!$isRangeSelection(selection) || !selection.isCollapsed() || selection.anchor.offset !== 0) return null;
-  return editorState.read(() => {
+  const current = editorState.read(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection) || !selection.isCollapsed() || selection.anchor.offset !== 0) return null;
     const block = nearestTextBlock(selection.anchor.getNode());
-    if (!block || prevEditorState._nodeMap.has(block.getKey())) return null;
+    if (!block) return null;
     let previous: LexicalNode | null = block.getPreviousSibling();
     const item = block.getParent();
     const previousItem = item instanceof ZettelListItemNode ? item.getPreviousSibling() : null;
     if (!previous && previousItem instanceof ZettelListItemNode) previous = previousItem.getLastChild();
-    return previous instanceof ZettelTextBlockNode && prevEditorState._nodeMap.has(previous.getKey()) ? previous.getKey() : null;
+    return {
+      blockKey: block.getKey(),
+      previousBlockKey: previous instanceof ZettelTextBlockNode ? previous.getKey() : null,
+    };
   });
+  if (!current?.previousBlockKey) return null;
+  const before = prevEditorState.read(() => ({
+    block: $getNodeByKey(current.blockKey),
+    previousBlock: $getNodeByKey(current.previousBlockKey!),
+  }));
+  return !before.block && before.previousBlock instanceof ZettelTextBlockNode
+    ? current.previousBlockKey
+    : null;
 }
 
 function nearestTextBlock(node: LexicalNode): ZettelTextBlockNode | null {
