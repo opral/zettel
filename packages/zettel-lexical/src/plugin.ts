@@ -18,9 +18,15 @@ import {
   REMOVE_TEXT_COMMAND,
   SELECT_ALL_COMMAND,
   $getRoot,
+  $isDecoratorNode,
+  $isElementNode,
+  $isLineBreakNode,
   $isRootNode,
+  $isTextNode,
   $selectAll,
+  ElementNode,
   type LexicalNode,
+  type PointType,
   type RangeSelection,
   type TextFormatType,
 } from "lexical";
@@ -36,6 +42,8 @@ import {
   ZettelImageNode,
   ZettelInlineHtmlNode,
   ZettelListItemNode,
+  ZettelListNode,
+  ZettelQuoteNode,
   ZettelSpanNode,
   ZettelTableCellNode,
   ZettelTextBlockNode,
@@ -173,7 +181,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(REMOVE_TEXT_COMMAND, () => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      selection.removeText();
+      $deleteSelection(selection, (current) => current.removeText());
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(CUT_COMMAND, (event) => {
@@ -181,33 +189,33 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       const copied = copyDocumentToClipboard(editor, "clipboardData" in event ? event as ClipboardEvent : null);
       if (!copied) return false;
       const selection = $getSelection();
-      if ($isRangeSelection(selection)) selection.removeText();
+      if ($isRangeSelection(selection)) $deleteSelection(selection, (current) => current.removeText());
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<KeyboardEvent>(KEY_BACKSPACE_COMMAND, (event) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
-      selection.deleteCharacter(true);
+      $deleteSelection(selection, (current) => current.deleteCharacter(true), true);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<KeyboardEvent>(KEY_DELETE_COMMAND, (event) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
-      selection.deleteCharacter(false);
+      $deleteSelection(selection, (current) => current.deleteCharacter(false));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(DELETE_CHARACTER_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      selection.deleteCharacter(isBackward);
+      $deleteSelection(selection, (current) => current.deleteCharacter(isBackward), isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(DELETE_WORD_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      selection.deleteWord(isBackward);
+      $deleteSelection(selection, (current) => current.deleteWord(isBackward), isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     // Cmd+Backspace / Cmd+Delete on macOS; Lexical has already prevented the
@@ -215,7 +223,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(DELETE_LINE_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      selection.deleteLine(isBackward);
+      $deleteSelection(selection, (current) => current.deleteLine(isBackward), isBackward);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand<KeyboardEvent>(KEY_ENTER_COMMAND, (event) => {
@@ -249,12 +257,19 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
         event.preventDefault();
         return true;
       }
-      if (textBlock && anchor instanceof ZettelSpanNode) {
-        if (event?.shiftKey) insertHardBreak(textBlock, anchor, selection.anchor.offset);
+      if (textBlock && !event?.shiftKey && isEmptyTextBlock(textBlock) && $exitContainer(textBlock)) {
+        // Return in an empty list item or on an empty last line of a quote
+        // leaves the list or quote, like other rich-text editors.
+        event?.preventDefault();
+        return true;
+      }
+      if (textBlock && (anchor instanceof ZettelSpanNode || anchor.is(textBlock))) {
+        const at = anchor instanceof ZettelSpanNode ? anchor : textBlock;
+        if (event?.shiftKey && at instanceof ZettelSpanNode) insertHardBreak(textBlock, at, selection.anchor.offset);
         else {
-          const item = nearestAncestor(textBlock, ZettelListItemNode);
-          if (item) splitListItem(item, textBlock, anchor, selection.anchor.offset);
-          else splitTextBlock(textBlock, anchor, selection.anchor.offset);
+          const item = textBlock.getParent();
+          if (item instanceof ZettelListItemNode) splitListItem(item, textBlock, at, selection.anchor.offset);
+          else splitTextBlock(textBlock, at, selection.anchor.offset);
         }
         event?.preventDefault();
         return true;
@@ -277,7 +292,269 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(SELECT_ALL_COMMAND, () => { $selectAll(); return true; }, COMMAND_PRIORITY_EDITOR),
+    // Lexical's generic merging and deletion knows nothing about Zettel's
+    // container contract. Repair it before the update commits, so an edit
+    // can never leave a document that exportDocument rejects.
+    editor.registerNodeTransform(ZettelListNode, $normalizeList),
+    editor.registerNodeTransform(ZettelListItemNode, $normalizeListItem),
+    editor.registerNodeTransform(ZettelQuoteNode, $wrapInlineChildren),
+    editor.registerNodeTransform(ZettelTextBlockNode, $resolveLinkMarks),
+    editor.registerNodeTransform(ZettelTableCellNode, $resolveLinkMarks),
   );
+}
+
+function isEmptyTextBlock(block: ZettelTextBlockNode): boolean {
+  return block.getChildren().every((child) => child instanceof ZettelSpanNode && child.getTextContentSize() === 0);
+}
+
+/** Return in an empty text block that ends a list item or a quote. */
+function $exitContainer(block: ZettelTextBlockNode): boolean {
+  const parent = block.getParent();
+  if (parent instanceof ZettelListItemNode) {
+    if (parent.getChildrenSize() !== 1) return false;
+    if ($outdentListItem(parent)) { block.selectStart(); return true; }
+    $liftListItem(parent)?.selectStart();
+    return true;
+  }
+  if (parent instanceof ZettelQuoteNode && block.is(parent.getLastChild())) {
+    parent.insertAfter(block);
+    if (parent.isEmpty()) parent.remove();
+    block.selectStart();
+    return true;
+  }
+  return false;
+}
+
+function isInlineNode(node: LexicalNode): boolean {
+  return $isTextNode(node) || $isLineBreakNode(node) || (($isElementNode(node) || $isDecoratorNode(node)) && node.isInline());
+}
+
+/** Containers of blocks hold blocks: wrap stray inline children in a text block. */
+function $wrapInlineChildren(container: ElementNode): void {
+  let run: ZettelTextBlockNode | null = null;
+  for (const child of container.getChildren()) {
+    if (!isInlineNode(child)) { run = null; continue; }
+    if (!run) {
+      run = $createZettelTextBlockNode({ style: "normal", markDefs: [] });
+      child.insertBefore(run);
+    }
+    // $resolveLinkMarks gives moved links a definition in the new block.
+    run.append(child);
+  }
+}
+
+const DECORATOR_MARKS = new Set(["strong", "em", "underline", "strike-through", "code"]);
+
+/**
+ * Deleting across blocks merges the spans of one block into another, but the
+ * link definitions stay in the block they came from. Give a moved linked span
+ * a definition in its new block, and drop marks that cannot be resolved.
+ */
+function $resolveLinkMarks(block: ZettelTextBlockNode | ZettelTableCellNode): void {
+  let markDefs = block.markDefs;
+  for (const child of block.getChildren()) {
+    if (!(child instanceof ZettelSpanNode || child instanceof ZettelImageNode || child instanceof ZettelInlineHtmlNode || child instanceof ZettelBreakNode)) continue;
+    const marks = child instanceof ZettelSpanNode ? child.getMarks() : child.marks;
+    const unresolved = marks.filter((mark) => !DECORATOR_MARKS.has(mark) && !markDefs.some((definition) => definition._key === mark));
+    if (!unresolved.length) continue;
+    const next = marks.filter((mark) => !unresolved.includes(mark));
+    const href = child instanceof ZettelSpanNode ? child.getLinkHref() : undefined;
+    if (href && !next.some((mark) => markDefs.some((definition) => definition._key === mark))) {
+      let definition = markDefs.find((candidate) => candidate.href === href);
+      if (!definition) {
+        definition = { _type: "zettel_link", _key: generateKey(), href };
+        markDefs = [...markDefs, definition];
+      }
+      next.push(definition._key);
+    }
+    if (child instanceof ZettelSpanNode) {
+      child.setMarks(next);
+      if (!next.some((mark) => markDefs.some((definition) => definition._key === mark))) child.setLinkHref(undefined);
+    } else {
+      (child.getWritable() as typeof child).marks = next;
+    }
+  }
+  if (markDefs !== block.markDefs) block.getWritable().markDefs = markDefs;
+}
+
+function $normalizeList(list: ZettelListNode): void {
+  for (const child of list.getChildren()) {
+    if (child instanceof ZettelListItemNode) continue;
+    const item = new ZettelListItemNode({ _type: "zettel_list_item", _key: generateKey(), spread: list.spread });
+    child.insertBefore(item);
+    item.append(child);
+    $wrapInlineChildren(item);
+  }
+  // A list has at least one item.
+  if (list.isEmpty()) list.remove();
+}
+
+function $normalizeListItem(item: ZettelListItemNode): void {
+  // An item that lost its blocks (its text was merged into the previous
+  // item) would stay behind as an empty bullet.
+  if (item.isEmpty()) { item.remove(); return; }
+  if (!(item.getParent() instanceof ZettelListNode)) {
+    for (const child of item.getChildren()) item.insertBefore(child);
+    item.remove();
+    return;
+  }
+  $wrapInlineChildren(item);
+}
+
+/** True when the selection spans from the first to the last position of the document. */
+function $selectsWholeDocument(selection: RangeSelection): boolean {
+  if (selection.isCollapsed()) return false;
+  const [start, end] = selection.isBackward() ? [selection.focus, selection.anchor] : [selection.anchor, selection.focus];
+  const root = $getRoot();
+  return isDocumentEdge(start, root.getFirstDescendant(), "start") && isDocumentEdge(end, root.getLastDescendant(), "end");
+}
+
+function isDocumentEdge(point: PointType, leaf: LexicalNode | null, edge: "start" | "end"): boolean {
+  if (!leaf) return false;
+  const node = point.getNode();
+  if (point.type === "text") return node.is(leaf) && point.offset === (edge === "start" ? 0 : node.getTextContentSize());
+  if (!$isElementNode(node)) return false;
+  const inner = edge === "start" ? node.getFirstDescendant() : node.getLastDescendant();
+  return (inner ?? node).is(leaf) && point.offset === (edge === "start" ? 0 : node.getChildrenSize());
+}
+
+/**
+ * Delete through Lexical, but when everything was selected leave one empty
+ * paragraph rather than an empty list item or quote.
+ */
+function $deleteSelection(selection: RangeSelection, remove: (selection: RangeSelection) => void, isBackward = false): void {
+  if (isBackward && $liftAtStart(selection)) return;
+  const whole = $selectsWholeDocument(selection);
+  remove(selection);
+  if (!whole) return;
+  const root = $getRoot();
+  if (root.getAllTextNodes().some((node) => node.getTextContentSize() > 0)) return;
+  const first = root.getFirstChild();
+  if (root.getChildrenSize() === 1 && first instanceof ZettelTextBlockNode) return;
+  root.clear();
+  const block = $createZettelTextBlockNode({ style: "normal", markDefs: [] });
+  root.append(block);
+  block.selectStart();
+}
+
+function listContinuation(list: ZettelListNode, firstIndex: number): ZettelListNode {
+  // The items after a removed item continue its count.
+  return new ZettelListNode({ _type: "zettel_list", kind: list.kind, spread: list.spread, ...(list.kind === "number" ? { start: (list.start ?? 1) + firstIndex } : {}) });
+}
+
+/**
+ * Replace a list item with its blocks at the list's position, splitting the
+ * list around it. Returns the first lifted block (an empty text block if the
+ * item had none), or null if the item is not in a list.
+ */
+function $liftListItem(item: ZettelListItemNode): ElementNode | null {
+  const list = item.getParent();
+  if (!(list instanceof ZettelListNode)) return null;
+  const index = list.getChildren().indexOf(item);
+  const following = item.getNextSiblings();
+  if (following.length) {
+    const rest = listContinuation(list, index);
+    rest.append(...following);
+    list.insertAfter(rest);
+  }
+  const blocks = item.getChildren();
+  if (!blocks.length) blocks.push($createZettelTextBlockNode({ style: "normal", markDefs: [] }));
+  let cursor: LexicalNode = list;
+  for (const block of blocks) { cursor.insertAfter(block); cursor = block; }
+  item.remove();
+  if (list.isEmpty()) list.remove();
+  const first = blocks[0];
+  return first instanceof ElementNode ? first : null;
+}
+
+/**
+ * Move an item of a nested list to the parent list, directly after the item
+ * that contains the nested list. Items and blocks that followed it move into
+ * it, so the visual order is kept. Returns false for a top-level list.
+ */
+function $outdentListItem(item: ZettelListItemNode): boolean {
+  const list = item.getParent();
+  const parentItem = list?.getParent();
+  if (!(list instanceof ZettelListNode) || !(parentItem instanceof ZettelListItemNode)) return false;
+  const following = item.getNextSiblings();
+  if (following.length) {
+    const rest = listContinuation(list, list.getChildren().indexOf(item));
+    rest.append(...following);
+    item.append(rest);
+  }
+  item.append(...list.getNextSiblings());
+  parentItem.insertAfter(item);
+  if (list.isEmpty()) list.remove();
+  return true;
+}
+
+/**
+ * Move a block out of its quote. The first block moves before the quote, a
+ * later one after it; the blocks that followed it stay quoted after it.
+ */
+function $liftQuoteBlock(quote: ZettelQuoteNode, block: ElementNode): void {
+  if (!block.getPreviousSibling()) quote.insertBefore(block);
+  else {
+    const following = block.getNextSiblings();
+    quote.insertAfter(block);
+    if (following.length) {
+      const rest = new ZettelQuoteNode({ _type: "zettel_quote" });
+      block.insertAfter(rest);
+      rest.append(...following);
+    }
+  }
+  if (quote.isEmpty()) quote.remove();
+}
+
+function isEmptySpan(node: LexicalNode): boolean {
+  return node instanceof ZettelSpanNode && node.getTextContentSize() === 0;
+}
+
+/**
+ * The text block whose very start a collapsed caret is at. The caret can be
+ * a text point in the block's first non-empty span, an element point on the
+ * block, or an element point at the start of the list item or quote that
+ * holds it, depending on how the browser placed it.
+ */
+function $textBlockAtCaretStart(selection: RangeSelection): ZettelTextBlockNode | undefined {
+  if (!selection.isCollapsed()) return undefined;
+  let node: LexicalNode = selection.anchor.getNode();
+  let offset = selection.anchor.offset;
+  while ((node instanceof ZettelListItemNode || node instanceof ZettelQuoteNode) && offset === 0) {
+    const first = node.getFirstChild();
+    if (!first) return undefined;
+    node = first;
+  }
+  const block = nearestAncestor(node, ZettelTextBlockNode);
+  if (!block) return undefined;
+  if (node.is(block)) return block.getChildren().slice(0, offset).every(isEmptySpan) ? block : undefined;
+  if (offset !== 0) return undefined;
+  let child: LexicalNode = node;
+  while (!child.getParent()?.is(block)) child = child.getParentOrThrow();
+  return child.getPreviousSiblings().every(isEmptySpan) ? block : undefined;
+}
+
+/**
+ * Backspace at the very start of a list item or of a quote line, like other
+ * rich-text editors: a nested item moves up one level, a top-level item
+ * becomes a paragraph, and a quote line moves out of the quote. The text is
+ * kept, not merged into the previous block.
+ */
+function $liftAtStart(selection: RangeSelection): boolean {
+  const block = $textBlockAtCaretStart(selection);
+  if (!block) return false;
+  const parent = block.getParent();
+  if (parent instanceof ZettelListItemNode && parent.getFirstChild()?.is(block)) {
+    if (!$outdentListItem(parent)) $liftListItem(parent);
+    block.selectStart();
+    return true;
+  }
+  if (parent instanceof ZettelQuoteNode) {
+    $liftQuoteBlock(parent, block);
+    block.selectStart();
+    return true;
+  }
+  return false;
 }
 
 function onChecklistChange(event: Event): void {
@@ -331,16 +608,26 @@ function remapInlineMarks(node: LexicalNode, marks: Map<string, string>): void {
   }
 }
 
-function splitTextBlock(block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): void {
+function splitTextBlock(block: ZettelTextBlockNode, anchor: ZettelSpanNode | ZettelTextBlockNode, offset: number): void {
   const trailing = splitBlockContent(block, anchor, offset);
   block.insertAfter(trailing);
   trailing.selectStart();
 }
 
-function splitBlockContent(block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): ZettelTextBlockNode {
+function splitBlockContent(block: ZettelTextBlockNode, anchor: ZettelSpanNode | ZettelTextBlockNode, offset: number): ZettelTextBlockNode {
   const cloned = cloneMarkDefs(block.markDefs);
   const trailing = $createZettelTextBlockNode({ style: block.style, markDefs: cloned.markDefs });
   const siblings = block.getChildren();
+  if (anchor.is(block)) {
+    // The caret sits between inline nodes (next to an image or a break).
+    for (const node of siblings.slice(offset)) {
+      node.remove();
+      remapInlineMarks(node, cloned.marks);
+      trailing.append(node);
+    }
+    return trailing;
+  }
+  if (!(anchor instanceof ZettelSpanNode)) return trailing;
   const index = siblings.indexOf(anchor);
   const source = anchor.getTextContent();
   const marks = anchor.toZettel().marks;
@@ -357,7 +644,7 @@ function splitBlockContent(block: ZettelTextBlockNode, anchor: ZettelSpanNode, o
   return trailing;
 }
 
-function splitListItem(item: ZettelListItemNode, block: ZettelTextBlockNode, anchor: ZettelSpanNode, offset: number): void {
+function splitListItem(item: ZettelListItemNode, block: ZettelTextBlockNode, anchor: ZettelSpanNode | ZettelTextBlockNode, offset: number): void {
   const trailing = splitBlockContent(block, anchor, offset);
   const itemBlocks = item.getChildren();
   const blockIndex = itemBlocks.indexOf(block);

@@ -205,6 +205,8 @@ export class ZettelSpanNode extends TextNode {
     return writable;
   }
   setLinkHref(href: string | undefined): this { const writable = this.getWritable(); writable.linkHref = href; return writable; }
+  /** The href this span renders as a link, kept on the node while it moves between blocks. */
+  getLinkHref(): string | undefined { return this.getLatest().linkHref; }
   private resolvedLinkHref(): string | undefined {
     if (this.linkHref !== undefined) return this.linkHref;
     const parent = this.getParent();
@@ -585,7 +587,9 @@ function appendInline(parent: ElementNode, children: Inline[], markDefs: Link[] 
 }
 
 export function exportInlineNode(node: LexicalNode): Inline[] {
-  if (node instanceof ZettelSpanNode) return [node.toZettel()];
+  // Zettel spans are never empty. Lexical keeps an emptied custom TextNode
+  // alive while the caret is in it; it has no content to export.
+  if (node instanceof ZettelSpanNode) return node.getTextContentSize() ? [node.toZettel()] : [];
   if (node instanceof ZettelBreakNode) return [node.toZettel()];
   if (node instanceof ZettelImageNode) return [node.toZettel()];
   if (node instanceof ZettelInlineHtmlNode) return [node.toZettel()];
