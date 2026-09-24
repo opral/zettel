@@ -18,6 +18,7 @@ const editor = createZettelEditor({
 });
 editor.setRootElement($("editor"));
 registerZettelLexicalPlugin(editor, {
+  markdownShortcuts: true,
   onPasteDiagnostics(diagnostics) {
     $("diagnostics").textContent = diagnostics
       .map((item) => item?.message ?? String(item))

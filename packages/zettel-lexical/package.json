@@ -28,19 +28,20 @@
     "format": "prettier ./src --write"
   },
   "dependencies": {
-    "@lexical/history": "^0.30.0",
-    "@lexical/utils": "^0.30.0",
+    "@lexical/extension": "^0.51.0",
+    "@lexical/history": "^0.51.0",
+    "@lexical/utils": "^0.51.0",
     "@opral/zettel-ast": "workspace:*",
     "@opral/zettel-html": "workspace:*"
   },
   "peerDependencies": {
-    "lexical": "^0.30.0"
+    "lexical": "^0.51.0"
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
     "jsdom": "^26.1.0",
     "prettier": "^3.5.3",
-    "lexical": "^0.30.0",
+    "lexical": "^0.51.0",
     "typescript": "~5.7.2",
     "vitest": "^3.1.1"
   }

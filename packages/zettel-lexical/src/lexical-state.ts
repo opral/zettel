@@ -1,5 +1,6 @@
 import {
   $getRoot,
+  $getSelection,
   CLEAR_HISTORY_COMMAND,
   createEditor,
   type LexicalEditor,
@@ -134,8 +135,13 @@ export function loadDocument(
         createLexicalNode(block, nodeRegistry),
       );
       const root = $getRoot();
+      // Clearing the root under the caret moves the selection onto the root
+      // itself. Typing there makes Lexical create a core ParagraphNode next
+      // to the Zettel blocks, so keep the caret in the new document instead.
+      const hadSelection = $getSelection() !== null;
       root.clear();
       root.append(...nodes);
+      if (hadSelection && nodes.length) root.selectStart();
     },
     { discrete: true },
   );
