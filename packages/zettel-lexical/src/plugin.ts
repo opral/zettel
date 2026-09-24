@@ -3,6 +3,7 @@ import {
   createCommand,
   $isRangeSelection,
   COMMAND_PRIORITY_EDITOR,
+  COMMAND_PRIORITY_LOW,
   COPY_COMMAND,
   CONTROLLED_TEXT_INSERTION_COMMAND,
   CUT_COMMAND,
@@ -12,6 +13,7 @@ import {
   FORMAT_TEXT_COMMAND,
   KEY_BACKSPACE_COMMAND,
   KEY_DELETE_COMMAND,
+  KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   LexicalEditor,
   PASTE_COMMAND,
@@ -25,6 +27,7 @@ import {
   $isTextNode,
   $selectAll,
   ElementNode,
+  $setSelection,
   type LexicalNode,
   type PointType,
   type RangeSelection,
@@ -34,6 +37,7 @@ import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { mergeRegister } from "@lexical/utils";
 import { copyDocumentToClipboard, pasteClipboardData } from "./clipboard.js";
 import { exportDocument } from "./lexical-state.js";
+import { registerZettelMarkdownShortcuts } from "./markdown-shortcuts.js";
 import {
   $createZettelBreakNode,
   $createZettelTextBlockNode,
@@ -97,6 +101,23 @@ export function $setZettelLink(href: string | null): boolean {
 
 export interface ZettelLexicalPluginOptions {
   onPasteDiagnostics?: (diagnostics: unknown[]) => void;
+  /**
+   * Opt in to Markdown-style input rules: `**bold**`, `__bold__`, `*italic*`,
+   * `_italic_`, `` `code` `` and `~~strike~~` when the closing marker is
+   * typed; `- `, `* `, `1. ` and `> ` at the start of a paragraph for lists
+   * and quotes; and links for bare http(s) URLs followed by a space or
+   * Return, or pasted (over selected text, a pasted URL links the text).
+   * Undo reverts a conversion and leaves the typed Markdown.
+   */
+  markdownShortcuts?: boolean;
+  /**
+   * Handle Mod+K (Cmd+K on macOS, Ctrl+K elsewhere) on selected text or in a
+   * link. Receive the selected text and the current href; return an href to
+   * link, `null` to remove the link, or `undefined` to leave it unchanged.
+   * The editor has no link UI of its own, so Mod+K is left to the browser
+   * when this is not set.
+   */
+  onLinkShortcut?: (link: { text: string; href?: string }) => string | null | undefined | Promise<string | null | undefined>;
 }
 
 /** Register normal editor commands plus Zettel clipboard integration. */
@@ -128,6 +149,30 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, input.data);
   }
   return mergeRegister(
+    options.markdownShortcuts ? registerZettelMarkdownShortcuts(editor, $setZettelLink) : () => {},
+    // Above COMMAND_PRIORITY_EDITOR: from Lexical 0.50, core's own keydown
+    // dispatch is a KEY_DOWN_COMMAND listener at that priority and handles
+    // every key, so a listener registered after it there never runs.
+    options.onLinkShortcut ? editor.registerCommand(KEY_DOWN_COMMAND, (event) => {
+      if (!isLinkShortcut(event)) return false;
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return false;
+      const href = currentLinkHref(selection);
+      if (selection.isCollapsed() && href === undefined) return false;
+      event.preventDefault();
+      const saved = selection.clone();
+      const apply = (result: string | null | undefined) => {
+        if (result === undefined) return;
+        editor.update(() => {
+          if (saved.getNodes().every((node) => node.isAttached())) $setSelection(saved.clone());
+          $setZettelLink(result);
+        });
+      };
+      const result = options.onLinkShortcut!({ text: selection.getTextContent(), ...(href === undefined ? {} : { href }) });
+      if (result instanceof Promise) void result.then(apply, () => {});
+      else apply(result);
+      return true;
+    }, COMMAND_PRIORITY_LOW) : () => {},
     unregisterRoot,
     editor.registerCommand(SET_ZETTEL_LINK_COMMAND, $setZettelLink, COMMAND_PRIORITY_EDITOR),
     registerHistory(editor, createEmptyHistoryState(), 300),
@@ -555,6 +600,22 @@ function $liftAtStart(selection: RangeSelection): boolean {
     return true;
   }
   return false;
+}
+
+function isLinkShortcut(event: KeyboardEvent): boolean {
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  return event.key.toLowerCase() === "k" && !event.shiftKey && !event.altKey && (mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey);
+}
+
+function currentLinkHref(selection: RangeSelection): string | undefined {
+  for (const node of selection.getNodes()) {
+    const parent = node.getParent();
+    if (!(node instanceof ZettelSpanNode) || !(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) continue;
+    const marks = node.toZettel().marks;
+    const link = parent.markDefs.find((definition) => marks.includes(definition._key));
+    if (link) return link.href;
+  }
+  return undefined;
 }
 
 function onChecklistChange(event: Event): void {
