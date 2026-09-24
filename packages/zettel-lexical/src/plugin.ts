@@ -32,7 +32,7 @@ import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { NormalizeTripleClickSelectionExtension } from "@lexical/extension/NormalizeTripleClickSelectionExtension";
 import { mergeRegister } from "@lexical/utils";
 import { copyDocumentToClipboard, pasteClipboardData } from "./clipboard.js";
-import { $deleteSelection, $removeSelectedText } from "./selection.js";
+import { $editRange, $removeSelectedText } from "./selection.js";
 import { exportDocument } from "./lexical-state.js";
 import {
   $createZettelBreakNode,
@@ -249,28 +249,27 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
-      $deleteSelection(selection, true);
+      $editRange(selection, () => selection.deleteCharacter(true));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(KEY_DELETE_COMMAND, (event) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       event?.preventDefault();
-      $deleteSelection(selection, false);
+      $editRange(selection, () => selection.deleteCharacter(false));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(DELETE_CHARACTER_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      $deleteSelection(selection, isBackward);
+      $editRange(selection, () => selection.deleteCharacter(isBackward));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(DELETE_WORD_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
       // A word or line deletion of a range deletes the range.
-      if (selection.isCollapsed()) selection.deleteWord(isBackward);
-      else $deleteSelection(selection, isBackward);
+      $editRange(selection, () => selection.isCollapsed() ? selection.deleteWord(isBackward) : selection.deleteCharacter(isBackward));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     // Cmd+Backspace / Cmd+Delete on macOS; Lexical has already prevented the
@@ -278,8 +277,7 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     editor.registerCommand(DELETE_LINE_COMMAND, (isBackward) => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return false;
-      if (selection.isCollapsed()) selection.deleteLine(isBackward);
-      else $deleteSelection(selection, isBackward);
+      $editRange(selection, () => selection.isCollapsed() ? selection.deleteLine(isBackward) : selection.deleteCharacter(isBackward));
       return true;
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
