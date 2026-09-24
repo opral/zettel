@@ -23,6 +23,7 @@ import {
   REMOVE_TEXT_COMMAND,
   SELECT_ALL_COMMAND,
   SELECTION_CHANGE_COMMAND,
+  $getEditor,
   $getRoot,
   $isDecoratorNode,
   $isElementNode,
@@ -413,8 +414,8 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
     }, COMMAND_PRIORITY_EDITOR),
     editor.registerCommand(SELECT_ALL_COMMAND, () => { $selectAll(); return true; }, COMMAND_PRIORITY_EDITOR),
     // Lexical's generic merging and deletion knows nothing about Zettel's
-    // container contract. Repair it before the update commits, so an edit
-    // can never leave a document that exportDocument rejects.
+    // container and link contracts. Repair them before the update commits,
+    // so an edit can never leave a document that exportDocument rejects.
     editor.registerNodeTransform(ZettelListNode, $normalizeList),
     editor.registerNodeTransform(ZettelListItemNode, $normalizeListItem),
     editor.registerNodeTransform(ZettelQuoteNode, $wrapInlineChildren),
@@ -478,7 +479,7 @@ function $resolveLinkMarks(block: ZettelTextBlockNode | ZettelTableCellNode): vo
     const unresolved = marks.filter((mark) => !DECORATOR_MARKS.has(mark) && !markDefs.some((definition) => definition._key === mark));
     if (!unresolved.length) continue;
     const next = marks.filter((mark) => !unresolved.includes(mark));
-    const href = child instanceof ZettelSpanNode ? child.getLinkHref() : undefined;
+    const href = (child instanceof ZettelSpanNode || child instanceof ZettelImageNode ? child.getLinkHref() : undefined) ?? $previousLinkHref(child, unresolved);
     if (href && !next.some((mark) => markDefs.some((definition) => definition._key === mark))) {
       let definition = markDefs.find((candidate) => candidate.href === href);
       if (!definition) {
@@ -487,11 +488,13 @@ function $resolveLinkMarks(block: ZettelTextBlockNode | ZettelTableCellNode): vo
       }
       next.push(definition._key);
     }
+    const linked = next.some((mark) => markDefs.some((definition) => definition._key === mark));
     if (child instanceof ZettelSpanNode) {
       child.setMarks(next);
-      if (!next.some((mark) => markDefs.some((definition) => definition._key === mark))) child.setLinkHref(undefined);
+      child.setLinkHref(linked ? href : undefined);
     } else {
       (child.getWritable() as typeof child).marks = next;
+      if (child instanceof ZettelImageNode) child.setLinkHref(linked ? href : undefined);
     }
   }
   if (markDefs !== block.markDefs) block.getWritable().markDefs = markDefs;
@@ -691,6 +694,19 @@ function currentLinkHref(selection: RangeSelection): string | undefined {
     if (link) return link.href;
   }
   return undefined;
+}
+
+/**
+ * The href a node's link mark resolved to before this update, in the block
+ * that held it then. Nodes restored from serialized Lexical state do not
+ * carry their href, only the key of a definition in their old block.
+ */
+function $previousLinkHref(node: LexicalNode, marks: string[]): string | undefined {
+  const previous = $getEditor().getEditorState()._nodeMap;
+  const parentKey = previous.get(node.getKey())?.__parent;
+  const parent = parentKey ? previous.get(parentKey) : undefined;
+  if (!(parent instanceof ZettelTextBlockNode || parent instanceof ZettelTableCellNode)) return undefined;
+  return marks.map((mark) => parent.markDefs.find((definition) => definition._key === mark)?.href).find(Boolean);
 }
 
 function onChecklistChange(event: Event): void {

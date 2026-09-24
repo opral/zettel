@@ -874,6 +874,54 @@ try {
   assert.equal(edited.blocks[0].code, "let \nnew_x = 1;");
   checks.push("Enter inside code inserts a code newline and retains the block");
 
+  // Joining two blocks moves the spans of one into the other; their links
+  // must move with them instead of pointing at a removed block's markDefs.
+  const linkedPairs = (block) =>
+    block.children.flatMap((child) =>
+      child.marks.flatMap((mark) => {
+        const definition = block.markDefs.find((d) => d._key === mark);
+        return definition ? [[child.text, definition.href]] : [];
+      }),
+    );
+  for (const key of ["Backspace", "Delete"]) {
+    await applyMarkdown(
+      "First [one](https://example.com/one).\n\nSee [the docs](https://example.com/docs) now.\n",
+    );
+    if (key === "Backspace") await caret("#editor p >> nth=1", 0);
+    else {
+      await page.locator("#editor p").first().evaluate((el) => {
+        el.closest("[contenteditable=true]").focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        document.dispatchEvent(new Event("selectionchange"));
+      });
+      await page.waitForTimeout(20);
+    }
+    await page.keyboard.press(key);
+    await page.waitForTimeout(80);
+    edited = await doc();
+    assert.equal(edited.blocks.length, 1, key);
+    assert.deepEqual(linkedPairs(edited.blocks[0]), [
+      ["one", "https://example.com/one"],
+      ["the docs", "https://example.com/docs"],
+    ]);
+    assert.deepEqual(
+      await page
+        .locator("#editor a")
+        .evaluateAll((links) =>
+          links.map((a) => [a.textContent, a.getAttribute("href")]),
+        ),
+      [
+        ["one", "https://example.com/one"],
+        ["the docs", "https://example.com/docs"],
+      ],
+    );
+  }
+  checks.push("Backspace and Delete joining blocks keep the joined block's links");
+
   const before = await doc();
   await page
     .locator("#json")

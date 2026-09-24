@@ -337,6 +337,7 @@ export class ZettelImageNode extends ZettelElementNode {
   static importJSON(node: SerializedZettelNode): ZettelImageNode { return new ZettelImageNode(node as unknown as Image); }
   override isInline(): boolean { return true; }
   setLinkHref(href: string | undefined): this { const writable = this.getWritable(); writable.linkHref = href; return writable; }
+  getLinkHref(): string | undefined { return this.getLatest().linkHref; }
   toZettel(): Image { const image: Image = { _type: "zettel_image", _key: this._key, src: this.src, alt: this.alt, marks: [...this.marks] }; if (this.title !== undefined) image.title = this.title; return image; }
   override exportJSON(): any { return jsonFor(this, this.toZettel() as unknown as Record<string, unknown>); }
   override createDOM(_config: EditorConfig): HTMLElement { const wrapper = element(this.linkHref ? "a" : "span", "zettel_image", this._key); if (this.linkHref) wrapper.setAttribute("href", safeLinkUrl(this.linkHref)); const image = document.createElement("img"); image.src = safeImageUrl(this.src); image.alt = this.alt; if (this.title !== undefined) image.title = this.title; wrapper.append(image); return wrapper; }
