@@ -101,6 +101,31 @@
 	white-space: pre-wrap;
 }
 
+/* Inline code: a chip in the code colors, the same while editing and rendered. */
+.zettel code {
+	background: var(--zettel-code-background);
+	border-radius: 0.25em;
+	color: var(--zettel-code-color);
+	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+	font-size: 0.9em;
+	padding: 0.1em 0.3em;
+}
+
+/* Linked code keeps the link color. */
+.zettel a code {
+	color: inherit;
+}
+
+/* Code blocks already have the background; their code is not a chip. */
+.zettel .zettel_code code,
+.zettel .zettel_html code {
+	background: none;
+	border-radius: 0;
+	color: inherit;
+	font-size: inherit;
+	padding: 0;
+}
+
 .zettel_code code,
 .zettel_html code,
 .zettel_html_inline {

@@ -94,6 +94,31 @@ try {
       style.static,
       `Shared CSS differs for ${style.selector}`,
     );
+  const codeStyles = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.background = "var(--zettel-code-background)";
+    document.querySelector("#preview").append(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const look = (selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const s = getComputedStyle(node);
+      return { background: s.backgroundColor, fontFamily: s.fontFamily, fontSize: s.fontSize, padding: s.padding };
+    };
+    return {
+      expected,
+      editorInline: look("#editor p code"),
+      staticInline: look("#preview p code"),
+      editorBlock: look("#editor pre.zettel_code code"),
+      staticBlock: look("#preview pre.zettel_code code"),
+    };
+  });
+  assert.notEqual(codeStyles.expected, "rgba(0, 0, 0, 0)");
+  assert.equal(codeStyles.editorInline?.background, codeStyles.expected, "inline code has the code background while editing");
+  assert.deepEqual(codeStyles.editorInline, codeStyles.staticInline, "inline code looks the same while editing and when rendered");
+  for (const block of [codeStyles.editorBlock, codeStyles.staticBlock])
+    assert.equal(block?.background, "rgba(0, 0, 0, 0)", "code inside a code block is not styled as an inline chip");
   checks.push("all four representations load with nested lists and GFM table");
   await mkdir(new URL("./artifacts/", import.meta.url), { recursive: true });
   await page.screenshot({
@@ -342,6 +367,60 @@ try {
   assert.equal(await page.locator("#editor strong").innerText(), "bold");
   assert.deepEqual(await page.locator("#editor p").allInnerTexts(), ["StartDocs bold", "second"]);
   checks.push("a Google Docs paste keeps its paragraphs editable");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // Google Docs carries formatting only in styles, copies an empty
+    // paragraph as <br> and ends the payload with Apple-interchange-newline.
+    dt.setData(
+      "text/html",
+      '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-2"><p dir="ltr"><span style="font-weight:700;">Bold</span><span style="font-weight:400;"> plain </span><span style="font-style:italic;">italic</span></p><br><p dir="ltr"><span style="font-weight:400;">Second</span></p></b><br class="Apple-interchange-newline">',
+    );
+    dt.setData("text/plain", "Bold plain italic\n\nSecond\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) =>
+      block.children.map((child) => [child._type === "zettel_span" ? child.text : child._type, child.marks]),
+    ),
+    [
+      [
+        ["Start", []],
+        ["Bold", ["strong"]],
+        [" plain ", []],
+        ["italic", ["em"]],
+      ],
+      [],
+      [["Second", []]],
+    ],
+  );
+  checks.push("a Google Docs paste keeps styled formatting and blank lines without bolding plain text");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // The shape of a Word desktop copy: Office namespace tags, conditional
+    // comments and a list written as paragraphs with a literal bullet.
+    dt.setData(
+      "text/html",
+      `<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta name=Generator content="Microsoft Word 15"><!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]--><style><!-- p.MsoNormal {margin:0cm;} --></style></head><body lang=EN-US><!--StartFragment--><p class=MsoNormal>Hello <b>bold</b><o:p></o:p></p><p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>One<o:p></o:p></p><p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>Two<o:p></o:p></p><!--EndFragment--></body></html>`,
+    );
+    dt.setData("text/plain", "Hello bold\n·  One\n·  Two\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator("#editor .zettel_html_inline").count(), 0);
+  assert.equal(await page.locator("#editor .zettel_html").count(), 0);
+  assert.deepEqual(await page.locator("#editor li").allInnerTexts(), ["One", "Two"]);
+  assert.ok(!(await page.locator("#editor").innerText()).includes("·"));
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("typed");
+  await page.waitForTimeout(100);
+  assert.equal((await page.locator("#editor").innerText()).trim(), "typed");
+  checks.push("a Word desktop paste drops Office markup, keeps its list, and select-all + delete clears it");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {

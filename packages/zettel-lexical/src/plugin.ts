@@ -21,6 +21,7 @@ import {
   $isDecoratorNode,
   $isElementNode,
   $isLineBreakNode,
+  $isRootNode,
   $isTextNode,
   $selectAll,
   ElementNode,
@@ -141,6 +142,19 @@ export function registerZettelLexicalPlugin(editor: LexicalEditor, options: Zett
         ? eventOrText
         : eventOrText.data ?? eventOrText.dataTransfer?.getData("text/plain") ?? null;
       if (text === null) return false;
+      if (selection.isCollapsed() && $isRootNode(selection.anchor.getNode())) {
+        // A caret directly in the root (a document without blocks) would make
+        // Lexical insert its own ParagraphNode. Type into a Zettel block.
+        const block = $createZettelTextBlockNode({ style: "normal", markDefs: [] });
+        const root = selection.anchor.getNode() as ReturnType<typeof $getRoot>;
+        const before = root.getChildAtIndex(selection.anchor.offset);
+        if (before) before.insertBefore(block); else root.append(block);
+        block.select();
+        const next = $getSelection();
+        if (!$isRangeSelection(next)) return false;
+        next.insertText(text);
+        return true;
+      }
       selection.insertText(text);
       return true;
     }, COMMAND_PRIORITY_EDITOR),
