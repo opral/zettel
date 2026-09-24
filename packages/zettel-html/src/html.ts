@@ -142,6 +142,12 @@ interface ParseContext {
 	options: HtmlImportOptions;
 }
 
+/**
+ * Word desktop and Outlook HTML: the Office XML namespaces on `<html>`, or
+ * the `Mso…` paragraph classes that remain when only a fragment is copied.
+ */
+const OFFICE_SOURCE = /urn:schemas-microsoft-com:office|\sclass\s*=\s*["']?Mso/i;
+
 function extensionValidationOptions(options: HtmlImportOptions): {
 	blocks: Record<string, () => string[]>;
 	inline: Record<string, () => string[]>;
@@ -554,10 +560,153 @@ function safeParsedUrl(
 	if (safe === undefined) addDiagnostic(context, "unsafe-url", `Dropped unsafe ${kind} URL.`, path);
 	return safe;
 }
+/**
+ * Google Docs wraps every copied fragment in
+ * `<b style="font-weight:normal" id="docs-internal-guid-…">`. The wrapper
+ * is clipboard framing, not formatting.
+ */
+function isGoogleDocsWrapper(node: HtmlElement): boolean {
+	return (attr(node, "id") ?? "").startsWith("docs-internal-guid-");
+}
+/**
+ * Chromium and WebKit mark the line break that closes a copied selection
+ * with this class. It frames the clipboard payload and carries no content.
+ */
+function isInterchangeNewline(node: HtmlElement): boolean {
+	return node.tagName === "br" && hasClass(node, "Apple-interchange-newline");
+}
+function styleDeclarations(node: HtmlElement): Map<string, string> {
+	const declarations = new Map<string, string>();
+	for (const declaration of (attr(node, "style") ?? "").split(";")) {
+		const colon = declaration.indexOf(":");
+		if (colon === -1) continue;
+		const property = declaration.slice(0, colon).trim().toLowerCase();
+		const value = declaration
+			.slice(colon + 1)
+			.replace(/!\s*important\s*$/i, "")
+			.trim()
+			.toLowerCase();
+		if (property && value) declarations.set(property, value);
+	}
+	return declarations;
+}
+/**
+ * Office namespace tags (`<o:p>`, `<w:sdt>`, `<v:shape>`, `<st1:place>`, …)
+ * written by Word and Outlook. They are clipboard noise: the importer drops
+ * empty ones and keeps the content of the others.
+ */
+function isNamespacedTag(node: HtmlElement): boolean {
+	return /^[a-z][\w.-]*:[\w.-]+$/i.test(node.tagName);
+}
+/**
+ * Whether a namespaced element carries nothing worth keeping. `<o:p>` is
+ * Word's paragraph-mark placeholder and holds at most a `&nbsp;` that keeps
+ * an empty paragraph open, so whitespace alone counts as empty for it.
+ */
+function isEmptyNamespacedElement(node: HtmlElement): boolean {
+	const hasImage = (current: HtmlNode): boolean =>
+		(isElement(current) && current.tagName === "img") || (current.childNodes ?? []).some(hasImage);
+	if (hasImage(node)) return false;
+	const text = textContent(node);
+	return node.tagName === "o:p" ? !text.trim() : !text;
+}
+/**
+ * Word content that exists only for renderers without list or hidden-text
+ * support: the literal bullet or number of a list paragraph
+ * (`<span style="mso-list:Ignore">·</span>`) and hidden text
+ * (`mso-hide:all`).
+ */
+function isOfficeHiddenContent(node: HtmlElement): boolean {
+	const style = styleDeclarations(node);
+	return style.get("mso-list") === "ignore" || style.get("mso-hide") === "all";
+}
+interface OfficeListParagraph {
+	list: string;
+	level: number;
+	kind: List["kind"];
+	start: number;
+}
+/**
+ * A Word list item: a paragraph styled `mso-list:l0 level1 lfo1`, whose
+ * marker text in the `mso-list:Ignore` span tells bullets from numbers.
+ */
+function officeListParagraph(node: HtmlElement): OfficeListParagraph | undefined {
+	if (node.tagName !== "p") return undefined;
+	const match = styleDeclarations(node)
+		.get("mso-list")
+		?.match(/^(l\d+)\s+level(\d+)/);
+	if (!match) return undefined;
+	const findMarker = (current: HtmlNode): HtmlElement | undefined => {
+		for (const child of current.childNodes ?? []) {
+			if (!isElement(child)) continue;
+			if (styleDeclarations(child).get("mso-list") === "ignore") return child;
+			const nested = findMarker(child);
+			if (nested) return nested;
+		}
+		return undefined;
+	};
+	const markerNode = findMarker(node);
+	const marker = markerNode ? textContent(markerNode).trim() : "";
+	const numbered = marker.match(/^\(?(\d+|[a-z]{1,6})[.)]$|^(\d+)$/i);
+	const digits = numbered?.[1] ?? numbered?.[2];
+	return {
+		list: match[1] as string,
+		level: Math.max(1, Number.parseInt(match[2] as string, 10)),
+		kind: numbered ? "number" : "bullet",
+		start: digits && /^\d+$/.test(digits) ? Math.min(999999999, Number.parseInt(digits, 10)) : 1,
+	};
+}
+function setMark(marks: string[], mark: string, on: boolean): void {
+	const index = marks.indexOf(mark);
+	if (on && index === -1) marks.push(mark);
+	if (!on && index !== -1) marks.splice(index, 1);
+}
+/**
+ * Marks for an inline element's content: the inherited marks, the element's
+ * own tag (`<b>`, `<i>`, …) and then its inline style, which overrides the
+ * tag the way CSS does. Word, Google Docs and other editors put formatting
+ * only in `style` (`font-weight:700`, `font-style:italic`,
+ * `text-decoration:line-through`), and an explicit `font-weight:normal`
+ * cancels an ancestor's bold.
+ */
 function inlineMarks(node: HtmlElement, inherited: string[]): string[] {
 	const marks = [...inherited];
+	if (isGoogleDocsWrapper(node)) return marks;
 	const mark = DECORATOR_TAGS[node.tagName];
-	if (mark && !marks.includes(mark)) marks.push(mark);
+	if (mark) setMark(marks, mark, true);
+	const style = styleDeclarations(node);
+	const weight = style.get("font-weight");
+	if (weight !== undefined) {
+		const numeric = Number.parseFloat(weight);
+		if (weight === "bold" || weight === "bolder" || numeric >= 600) setMark(marks, "strong", true);
+		else if (weight === "normal" || weight === "lighter" || numeric < 600)
+			setMark(marks, "strong", false);
+	}
+	const fontStyle = style.get("font-style");
+	if (fontStyle !== undefined) {
+		if (fontStyle.startsWith("italic") || fontStyle.startsWith("oblique"))
+			setMark(marks, "em", true);
+		else if (fontStyle === "normal") setMark(marks, "em", false);
+	}
+	const decoration = style.get("text-decoration-line") ?? style.get("text-decoration");
+	if (decoration !== undefined) {
+		const lines = decoration.split(/\s+/);
+		// Decorations propagate to descendants in CSS, so `none` removes only
+		// the decoration this element's own tag (<u>, <s>, <del>) added.
+		for (const [line, decorator] of [
+			["line-through", "strike-through"],
+			["underline", "underline"],
+		] as const) {
+			if (lines.includes(line)) setMark(marks, decorator, true);
+			else if (lines.includes("none") && mark === decorator && !inherited.includes(decorator))
+				setMark(marks, decorator, false);
+		}
+	}
+	// Links render underlined, so an underline style on a link or inside one
+	// (Google Docs styles every link's span that way) is link styling.
+	const insideLink = node.tagName === "a" || marks.some((item) => !DECORATORS.includes(item));
+	if (insideLink && mark !== "underline" && !inherited.includes("underline"))
+		setMark(marks, "underline", false);
 	return marks;
 }
 function normalizeMarks(marks: string[]): string[] {
@@ -589,8 +738,21 @@ function parseInlineNodes(
 			continue;
 		}
 		if (node.nodeName === "#comment" || !isElement(node)) continue;
-		if (METADATA_TAGS.has(node.tagName)) continue;
+		if (METADATA_TAGS.has(node.tagName) || isOfficeHiddenContent(node)) continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
+		if (isNamespacedTag(node)) {
+			if (!isEmptyNamespacedElement(node))
+				result.push(
+					...parseInlineNodes(
+						node.childNodes ?? [],
+						context,
+						markDefs,
+						inlineMarks(node, inherited),
+						currentPath
+					)
+				);
+			continue;
+		}
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
 			addDiagnostic(context, "dropped-element", `Dropped <${node.tagName}> element.`, currentPath);
@@ -611,6 +773,7 @@ function parseInlineNodes(
 				continue;
 			}
 		}
+		if (isInterchangeNewline(node)) continue;
 		if (node.tagName === "br") {
 			result.push({
 				_type: "zettel_break",
@@ -655,12 +818,11 @@ function parseInlineNodes(
 		}
 		if (node.tagName === "a") {
 			const href = safeParsedUrl(attr(node, "href"), "link", context, currentPath);
-			let nextMarks = [...inherited];
+			let nextMarks = inlineMarks(node, inherited);
 			if (href !== undefined) {
 				const supplied = attr(node, "data-zettel-mark-key");
 				const title = attr(node, "title");
-				const usableKey =
-					validKey(supplied) && !DECORATORS.includes(supplied);
+				const usableKey = validKey(supplied) && !DECORATORS.includes(supplied);
 				const existing = usableKey
 					? markDefs.find(
 							(definition) =>
@@ -965,6 +1127,19 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 	const inlineBuffer: HtmlNode[] = [];
 	const flushInline = (): void => {
 		if (!inlineBuffer.length) return;
+		if (inlineBuffer.every((node) => isElement(node) && node.tagName === "br")) {
+			// A <br> standing between blocks is a blank line, not text holding a
+			// hard break. Google Docs copies each empty paragraph this way.
+			for (const br of inlineBuffer.splice(0))
+				blocks.push({
+					_type: "zettel_block",
+					_key: keyFor(br, context, path),
+					style: "normal",
+					children: [],
+					markDefs: [],
+				});
+			return;
+		}
 		const markDefs: Link[] = [];
 		const children = parseInlineNodes(
 			inlineBuffer.splice(0),
@@ -982,14 +1157,72 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 				markDefs,
 			});
 	};
+	// Word writes a list as consecutive list paragraphs; the lists they have
+	// built so far, outermost first.
+	let officeLists: Array<{ list: List; source: string }> = [];
+	const addOfficeListItem = (node: HtmlElement, item: OfficeListParagraph, currentPath: string) => {
+		const level = Math.min(item.level, officeLists.length + 1);
+		officeLists = officeLists.slice(0, level);
+		const current = officeLists[level - 1];
+		if (
+			!current ||
+			current.list.kind !== item.kind ||
+			(level === 1 && current.source !== item.list)
+		) {
+			const list: List = {
+				_type: "zettel_list",
+				_key: keyFor(undefined, context, currentPath),
+				kind: item.kind,
+				...(item.kind === "number" ? { start: item.start } : {}),
+				spread: false,
+				items: [],
+			};
+			const parent = officeLists[level - 2]?.list.items.at(-1);
+			if (parent) parent.blocks.push(list);
+			else blocks.push(list);
+			officeLists[level - 1] = { list, source: item.list };
+		}
+		officeLists[level - 1]?.list.items.push({
+			_type: "zettel_list_item",
+			_key: keyFor(undefined, context, currentPath),
+			blocks: [makeTextBlock(node, "normal", context, currentPath)],
+			spread: false,
+		});
+	};
 	for (const [index, node] of nodes.entries()) {
 		if (node.nodeName === "#comment") continue;
 		if (node.nodeName === "#text") {
-			if ((node.value ?? "").trim()) inlineBuffer.push(node);
+			if ((node.value ?? "").trim()) {
+				officeLists = [];
+				inlineBuffer.push(node);
+			}
 			continue;
 		}
-		if (!isElement(node) || METADATA_TAGS.has(node.tagName)) continue;
+		if (
+			!isElement(node) ||
+			METADATA_TAGS.has(node.tagName) ||
+			isInterchangeNewline(node) ||
+			isOfficeHiddenContent(node)
+		)
+			continue;
 		const currentPath = `${path}.${node.tagName}[${index}]`;
+		if (isNamespacedTag(node)) {
+			if (isEmptyNamespacedElement(node)) continue;
+			officeLists = [];
+			if (containsBlocks(node)) {
+				flushInline();
+				blocks.push(...parseBlocks(node.childNodes ?? [], context, currentPath));
+			} else inlineBuffer.push(node);
+			continue;
+		}
+		const officeListItem = officeListParagraph(node);
+		if (officeListItem) {
+			flushInline();
+			scrubAttributes(node, context, currentPath);
+			addOfficeListItem(node, officeListItem, currentPath);
+			continue;
+		}
+		officeLists = [];
 		scrubAttributes(node, context, currentPath);
 		if (node.tagName === "script" || node.tagName === "style") {
 			flushInline();
@@ -1116,6 +1349,51 @@ function parseBlocks(nodes: HtmlNode[], context: ParseContext, path = "blocks"):
 	return blocks;
 }
 
+/**
+ * Word wraps its HTML at about 80 columns by turning a space into a line
+ * break, even inside text, and relies on the browser to collapse it. Word
+ * writes meaningful extra spaces as `&nbsp;`, so its ASCII whitespace can be
+ * collapsed the way a browser renders it: one space between words, none at
+ * the edges of a line.
+ */
+function collapseOfficeWhitespace(blocks: Block[]): void {
+	const collapseLine = (children: Inline[]): Inline[] => {
+		const result: Inline[] = [];
+		let afterSpace = true;
+		const trimEnd = (): void => {
+			const last = result.at(-1) as AstSpan | undefined;
+			if (last?._type !== "zettel_span" || !last.text.endsWith(" ")) return;
+			last.text = last.text.slice(0, -1);
+			if (!last.text) result.pop();
+		};
+		for (const child of children) {
+			const span = child as AstSpan;
+			if (span._type === "zettel_span") {
+				let text = span.text.replace(/[ \t\n\r\f]+/g, " ");
+				if (afterSpace && text.startsWith(" ")) text = text.slice(1);
+				if (!text) continue;
+				span.text = text;
+				afterSpace = text.endsWith(" ");
+			} else if (child._type === "zettel_break") {
+				trimEnd();
+				afterSpace = true;
+			} else afterSpace = false;
+			result.push(child);
+		}
+		trimEnd();
+		return result;
+	};
+	for (const block of blocks as Array<AstTextBlock | AstList | AstQuote | AstTable>) {
+		if (block._type === "zettel_block") block.children = collapseLine(block.children);
+		else if (block._type === "zettel_list")
+			for (const item of block.items) collapseOfficeWhitespace(item.blocks);
+		else if (block._type === "zettel_quote") collapseOfficeWhitespace(block.blocks);
+		else if (block._type === "zettel_table")
+			for (const row of block.rows)
+				for (const cell of row.cells) cell.children = collapseLine(cell.children);
+	}
+}
+
 export function importHtml(html: string, options: HtmlImportOptions = {}): HtmlImportResult {
 	if (typeof html !== "string") throw new TypeError("importHtml expects an HTML string.");
 	const diagnostics: Diagnostic[] = [];
@@ -1133,6 +1411,7 @@ export function importHtml(html: string, options: HtmlImportOptions = {}): HtmlI
 			? roots.flatMap((node) => (node === wrapper ? (wrapper.childNodes ?? []) : [node]))
 			: roots;
 	const document = { _type: "zettel_doc", blocks: parseBlocks(source, context) } as Document;
+	if (OFFICE_SOURCE.test(html)) collapseOfficeWhitespace(document.blocks);
 	// Importers must never return an invalid Document, even when a handler or
 	// a future parser change violates an invariant not caught locally.
 	assertDocument(document, extensionValidationOptions(options));
