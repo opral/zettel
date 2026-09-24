@@ -94,6 +94,31 @@ try {
       style.static,
       `Shared CSS differs for ${style.selector}`,
     );
+  const codeStyles = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.background = "var(--zettel-code-background)";
+    document.querySelector("#preview").append(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const look = (selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const s = getComputedStyle(node);
+      return { background: s.backgroundColor, fontFamily: s.fontFamily, fontSize: s.fontSize, padding: s.padding };
+    };
+    return {
+      expected,
+      editorInline: look("#editor p code"),
+      staticInline: look("#preview p code"),
+      editorBlock: look("#editor pre.zettel_code code"),
+      staticBlock: look("#preview pre.zettel_code code"),
+    };
+  });
+  assert.notEqual(codeStyles.expected, "rgba(0, 0, 0, 0)");
+  assert.equal(codeStyles.editorInline?.background, codeStyles.expected, "inline code has the code background while editing");
+  assert.deepEqual(codeStyles.editorInline, codeStyles.staticInline, "inline code looks the same while editing and when rendered");
+  for (const block of [codeStyles.editorBlock, codeStyles.staticBlock])
+    assert.equal(block?.background, "rgba(0, 0, 0, 0)", "code inside a code block is not styled as an inline chip");
   checks.push("all four representations load with nested lists and GFM table");
   await mkdir(new URL("./artifacts/", import.meta.url), { recursive: true });
   await page.screenshot({
@@ -398,6 +423,60 @@ try {
   assert.equal(await page.locator("#editor strong").innerText(), "bold");
   assert.deepEqual(await page.locator("#editor p").allInnerTexts(), ["StartDocs bold", "second"]);
   checks.push("a Google Docs paste keeps its paragraphs editable");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // Google Docs carries formatting only in styles, copies an empty
+    // paragraph as <br> and ends the payload with Apple-interchange-newline.
+    dt.setData(
+      "text/html",
+      '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-2"><p dir="ltr"><span style="font-weight:700;">Bold</span><span style="font-weight:400;"> plain </span><span style="font-style:italic;">italic</span></p><br><p dir="ltr"><span style="font-weight:400;">Second</span></p></b><br class="Apple-interchange-newline">',
+    );
+    dt.setData("text/plain", "Bold plain italic\n\nSecond\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.deepEqual(
+    (await doc()).blocks.map((block) =>
+      block.children.map((child) => [child._type === "zettel_span" ? child.text : child._type, child.marks]),
+    ),
+    [
+      [
+        ["Start", []],
+        ["Bold", ["strong"]],
+        [" plain ", []],
+        ["italic", ["em"]],
+      ],
+      [],
+      [["Second", []]],
+    ],
+  );
+  checks.push("a Google Docs paste keeps styled formatting and blank lines without bolding plain text");
+  await applyMarkdown("Start\n");
+  await caret("#editor p", 5);
+  await page.locator("#editor").evaluate((el) => {
+    const dt = new DataTransfer();
+    // The shape of a Word desktop copy: Office namespace tags, conditional
+    // comments and a list written as paragraphs with a literal bullet.
+    dt.setData(
+      "text/html",
+      `<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta name=Generator content="Microsoft Word 15"><!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]--><style><!-- p.MsoNormal {margin:0cm;} --></style></head><body lang=EN-US><!--StartFragment--><p class=MsoNormal>Hello <b>bold</b><o:p></o:p></p><p class=MsoListParagraphCxSpFirst style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>One<o:p></o:p></p><p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>Two<o:p></o:p></p><!--EndFragment--></body></html>`,
+    );
+    dt.setData("text/plain", "Hello bold\n·  One\n·  Two\n");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator("#editor .zettel_html_inline").count(), 0);
+  assert.equal(await page.locator("#editor .zettel_html").count(), 0);
+  assert.deepEqual(await page.locator("#editor li").allInnerTexts(), ["One", "Two"]);
+  assert.ok(!(await page.locator("#editor").innerText()).includes("·"));
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("typed");
+  await page.waitForTimeout(100);
+  assert.equal((await page.locator("#editor").innerText()).trim(), "typed");
+  checks.push("a Word desktop paste drops Office markup, keeps its list, and select-all + delete clears it");
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
   await page.locator("#editor").evaluate((el) => {
@@ -557,6 +636,69 @@ try {
   checks.push(
     "Enter creates a sibling list item and a real checkbox click updates task state",
   );
+
+  const listShape = (document) => document.blocks.map((block) =>
+    block._type === "zettel_list"
+      ? block.items.map((item) => item.blocks.map((b) => (b.children ?? []).map((n) => n.text ?? "").join("")).join("|"))
+      : (block.children ?? []).map((n) => n.text ?? "").join(""),
+  );
+  await applyMarkdown("- one\n- two\n");
+  await caret("#editor li:nth-child(2) p", 3);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("after");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["one", "two"], "after"], "Enter on an empty item leaves the list");
+  await caret("#editor li:nth-child(2) p", 0);
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["one"], "two", "after"], "Backspace at an item's start turns it into a paragraph");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), [["onetwo"], "after"], "a second Backspace joins it to the previous item");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("fresh");
+  await page.waitForTimeout(80);
+  assert.deepEqual(listShape(await doc()), ["fresh"], "Select all and Backspace leaves a paragraph, not an empty bullet");
+  assert.equal(await page.locator("#editor li").count(), 0);
+  checks.push("Enter and Backspace leave lists without ghost items; select all + Backspace clears them");
+
+  const shapeOf = (blocks) => blocks.map((block) =>
+    block._type === "zettel_list"
+      ? { [block.kind]: block.items.map((item) => shapeOf(item.blocks)) }
+      : block._type === "zettel_quote"
+        ? { quote: shapeOf(block.blocks) }
+        : (block.children ?? []).map((n) => n.text ?? "").join(""),
+  );
+  await applyMarkdown("- one\n  - inner\n- two\n");
+  await caret("#editor li li p", 5);
+  for (let i = 0; i < 5; i += 1) await page.keyboard.press("ArrowLeft");
+  // Lexical reads the caret from the asynchronous selectionchange event.
+  await page.waitForTimeout(80);
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"], ["inner"], ["two"]] }], "Backspace at a nested item's start outdents it");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"]] }, "inner", { bullet: [["two"]] }], "a second Backspace turns it into a paragraph");
+  await page.keyboard.type("ab");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ bullet: [["one"]] }, "inner", { bullet: [["two"]] }], "Backspace inside text still deletes characters");
+  await applyMarkdown("> first\n>\n> middle\n>\n> last\n");
+  await caret("#editor blockquote p:nth-child(2)", 6);
+  for (let i = 0; i < 6; i += 1) await page.keyboard.press("ArrowLeft");
+  // Lexical reads the caret from the asynchronous selectionchange event.
+  await page.waitForTimeout(80);
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ quote: ["first"] }, "middle", { quote: ["last"] }], "Backspace at a quote line's start moves the line out");
+  await page.keyboard.type("X");
+  await page.waitForTimeout(80);
+  assert.deepEqual(shapeOf((await doc()).blocks), [{ quote: ["first"] }, "Xmiddle", { quote: ["last"] }]);
+  checks.push("Backspace at the start of a non-empty nested item outdents it, and at a quote line's start moves the line out");
 
   await applyMarkdown("Before after.\n");
   await caret("#editor p", 7);
