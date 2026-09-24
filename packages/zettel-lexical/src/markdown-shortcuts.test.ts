@@ -155,6 +155,28 @@ it('Mod+K asks the application for a link and applies it', async () => {
  expect(spans(first(editor))).toEqual([['read the ', []], ['docs', ['link:https://docs.test']]]);
 });
 
+it('does not apply a delayed link result to the current selection after its original target is removed', async () => {
+ let resolveHref!: (href: string | null | undefined) => void;
+ const editor = setup('', { onLinkShortcut: () => new Promise(resolve => { resolveHref = resolve; }) });
+ loadDocument(editor, { _type: 'zettel_doc', blocks: [
+  { _type: 'zettel_block', _key: 'original', style: 'normal', markDefs: [], children: [{ _type: 'zettel_span', _key: 'original-text', text: 'original', marks: [] }] },
+  { _type: 'zettel_block', _key: 'replacement', style: 'normal', markDefs: [], children: [{ _type: 'zettel_span', _key: 'replacement-text', text: 'replacement', marks: [] }] },
+ ] } as any);
+ editor.update(() => { $getRoot().getAllTextNodes()[0]!.select(0, 8); }, { discrete: true });
+ const event = new KeyboardEvent('keydown', { key: 'k', cancelable: true, ...(/Mac/.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true }) });
+ editor.update(() => { editor.dispatchCommand(KEY_DOWN_COMMAND, event); }, { discrete: true });
+ expect(event.defaultPrevented).toBe(true);
+
+ loadDocument(editor, { _type: 'zettel_doc', blocks: [
+  { _type: 'zettel_block', _key: 'new', style: 'normal', markDefs: [], children: [{ _type: 'zettel_span', _key: 'new-text', text: 'new selection', marks: [] }] },
+ ] } as any);
+ editor.update(() => { $getRoot().getAllTextNodes()[0]!.select(0, 3); }, { discrete: true });
+ resolveHref('https://stale.test');
+ await flush();
+
+ expect(spans(first(editor))).toEqual([['new selection', []]]);
+});
+
 it('is off unless the plugin is registered with markdownShortcuts', async () => {
  const editor = setup('', {});
  await type(editor, '**bold** - x https://example.com ');
